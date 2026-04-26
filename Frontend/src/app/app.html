@@ -1,7 +1,13 @@
-<main class="app-layout">
-  <app-navbar />
-  <div class="content-area">
-    <router-outlet />
-  </div>
-  <app-footer />
-</main>
+<div class="app-layout" [class.authenticated]="authService.isAuthenticated()">
+  @if (authService.isAuthenticated()) {
+    <app-navbar />
+    <main class="main-content">
+      <router-outlet />
+    </main>
+    <app-footer />
+  } @else {
+    <div class="auth-container">
+      <router-outlet />
+    </div>
+  }
+</div>

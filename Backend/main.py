@@ -10,7 +10,6 @@ from passlib.context import CryptContext
 import models, schemas
 from database import SessionLocal, engine
 
-# Security Configuration
 SECRET_KEY = "crypticsync_secret_key_change_me_in_production"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
@@ -30,7 +29,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Auth Helpers
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
 
@@ -73,120 +71,18 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
         raise credentials_exception
     return user
 
-# Sequential ID Helper
-def generate_employee_id(db: Session):
-    last_user = db.query(models.User).order_by(models.User.id.desc()).first()
-    if not last_user:
-        return "EMP-1001"
-    last_id = int(last_user.employee_id.split("-")[1])
-    return f"EMP-{last_id + 1}"
-
-# Initialization
-def init_db(db: Session):
-    # Check for Admin
-    admin = db.query(models.User).filter(models.User.employee_id == "EMP-1000").first()
-    admin_pass = get_password_hash("admin123")
-    if not admin:
-        admin = models.User(
-            employee_id="EMP-1000",
-            name="System Administrator",
-            email="admin@crypticsync.com",
-            hashed_password=admin_pass,
-            department="IT",
-            designation="CTO",
-            role=models.UserRole.ADMIN,
-            is_active=True
-        )
-        db.add(admin)
-    else:
-        admin.email = "admin@crypticsync.com"
-        admin.hashed_password = admin_pass
-        admin.role = models.UserRole.ADMIN
-    db.commit()
-
-    # Check for Manager
-    manager = db.query(models.User).filter(models.User.employee_id == "EMP-1001").first()
-    manager_pass = get_password_hash("manager123")
-    if not manager:
-        # Get admin id for manager_id
-        admin_id = db.query(models.User).filter(models.User.employee_id == "EMP-1000").first().id
-        manager = models.User(
-            employee_id="EMP-1001",
-            name="Jane Manager",
-            email="jane@crypticsync.com",
-            hashed_password=manager_pass,
-            department="Engineering",
-            designation="Engineering Manager",
-            role=models.UserRole.MANAGER,
-            manager_id=admin_id,
-            is_active=True
-        )
-        db.add(manager)
-    else:
-        manager.email = "jane@crypticsync.com"
-        manager.hashed_password = manager_pass
-        manager.role = models.UserRole.MANAGER
-    db.commit()
-
-    # Check for Employee
-    employee = db.query(models.User).filter(models.User.employee_id == "EMP-1002").first()
-    employee_pass = get_password_hash("employee123")
-    if not employee:
-        # Get manager id for manager_id
-        manager_id = db.query(models.User).filter(models.User.employee_id == "EMP-1001").first().id
-        employee = models.User(
-            employee_id="EMP-1002",
-            name="John Employee",
-            email="john@crypticsync.com",
-            hashed_password=employee_pass,
-            department="Engineering",
-            designation="Software Engineer",
-            role=models.UserRole.EMPLOYEE,
-            manager_id=manager_id,
-            is_active=True
-        )
-        db.add(employee)
-    else:
-        employee.email = "john@crypticsync.com"
-        employee.hashed_password = employee_pass
-        employee.role = models.UserRole.EMPLOYEE
-    db.commit()
-
-    # Add Holidays if empty
-    if db.query(models.Holiday).count() == 0:
-        holidays = [
-            models.Holiday(date=date(2024, 1, 1), holiday_name="New Year's Day"),
-            models.Holiday(date=date(2024, 12, 25), holiday_name="Christmas")
-        ]
-        db.add_all(holidays)
-        db.commit()
-
-@app.on_event("startup")
-def on_startup():
-    db = SessionLocal()
-    try:
-        init_db(db)
-    finally:
-        db.close()
-
 @app.get("/")
 def read_root(db: Session = Depends(get_db)):
-    init_db(db)
     user_count = db.query(models.User).count()
     return {
         "message": "CrypticSync Enterprise API is running.",
         "user_count": user_count
     }
 
-# Auth Endpoints
 @app.post("/api/token", response_model=schemas.Token)
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    # Ensure DB is initialized
-    init_db(db)
-    
     user = db.query(models.User).filter(models.User.email == form_data.username).first()
     if not user:
-        # Also try employee_id
         user = db.query(models.User).filter(models.User.employee_id == form_data.username).first()
         
     if not user or not verify_password(form_data.password, user.hashed_password):
@@ -202,20 +98,53 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
-@app.get("/api/users/me", response_model=schemas.User)
-async def read_users_me(current_user: models.User = Depends(get_current_user)):
-    return current_user
+@app.get("/api/users/me", response_model=schemas.UserWithTeam)
+async def read_users_me(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    team = db.query(models.Team).filter(models.Team.id == current_user.team_id).first() if current_user.team_id else None
+    manager = db.query(models.User).filter(models.User.id == current_user.manager_id).first() if current_user.manager_id else None
+    
+    return schemas.UserWithTeam(
+        id=current_user.id,
+        employee_id=current_user.employee_id,
+        name=current_user.name,
+        email=current_user.email,
+        department=current_user.department,
+        designation=current_user.designation,
+        role=current_user.role,
+        team_id=current_user.team_id,
+        team_name=team.name if team else None,
+        manager_id=current_user.manager_id,
+        manager_name=manager.name if manager else None,
+        is_active=current_user.is_active
+    )
 
-# Users Management
-@app.get("/api/users", response_model=List[schemas.User])
+@app.get("/api/users", response_model=List[schemas.UserWithTeam])
 def get_users(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    if current_user.role == models.UserRole.ADMIN:
+    if current_user.role in [models.UserRole.CTO, models.UserRole.ADMIN]:
         return db.query(models.User).all()
     elif current_user.role == models.UserRole.MANAGER:
-        return db.query(models.User).filter(models.User.manager_id == current_user.id).all()
+        direct = db.query(models.User).filter(models.User.manager_id == current_user.id).all()
+        all_users = [current_user] + direct
+        for r in direct:
+            if r.role == models.UserRole.MANAGER:
+                sub = db.query(models.User).filter(models.User.manager_id == r.id).all()
+                all_users.extend(sub)
+        return all_users
     return [current_user]
 
-# Attendance
+@app.get("/api/reportees", response_model=List[schemas.UserWithTeam])
+def get_reportees(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    if current_user.role in [models.UserRole.CTO, models.UserRole.ADMIN]:
+        return db.query(models.User).filter(models.User.manager_id == current_user.id).all()
+    elif current_user.role == models.UserRole.MANAGER:
+        direct = db.query(models.User).filter(models.User.manager_id == current_user.id).all()
+        result = list(direct)
+        for user in direct:
+            if user.role == models.UserRole.MANAGER:
+                result.extend(db.query(models.User).filter(models.User.manager_id == user.id).all())
+        return result
+    return []
+
 @app.get("/api/attendance", response_model=List[schemas.Attendance])
 def get_attendance(date: Optional[date] = None, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     query = db.query(models.Attendance)
@@ -227,7 +156,6 @@ def get_attendance(date: Optional[date] = None, db: Session = Depends(get_db), c
 
 @app.post("/api/attendance", response_model=schemas.Attendance)
 def mark_attendance(attendance_data: schemas.AttendanceCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    # Check if record already exists for this user and date
     existing = db.query(models.Attendance).filter(
         models.Attendance.user_id == attendance_data.user_id,
         models.Attendance.date == attendance_data.date
@@ -237,6 +165,7 @@ def mark_attendance(attendance_data: schemas.AttendanceCreate, db: Session = Dep
         existing.status = attendance_data.status
         existing.punch_in = attendance_data.punch_in
         existing.punch_out = attendance_data.punch_out
+        existing.total_hours = attendance_data.total_hours
         db.commit()
         db.refresh(existing)
         return existing
@@ -246,23 +175,53 @@ def mark_attendance(attendance_data: schemas.AttendanceCreate, db: Session = Dep
         date=attendance_data.date,
         status=attendance_data.status,
         punch_in=attendance_data.punch_in,
-        punch_out=attendance_data.punch_out
+        punch_out=attendance_data.punch_out,
+        total_hours=attendance_data.total_hours
     )
     db.add(new_record)
     db.commit()
     db.refresh(new_record)
     return new_record
 
-# Leave Requests
+@app.get("/api/leaves/me", response_model=List[schemas.LeaveRequest])
+def get_my_leaves(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return db.query(models.LeaveRequest).filter(models.LeaveRequest.user_id == current_user.id).all()
+
 @app.get("/api/leaves", response_model=List[schemas.LeaveRequest])
 def get_leaves(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     if current_user.role == models.UserRole.EMPLOYEE:
         return db.query(models.LeaveRequest).filter(models.LeaveRequest.user_id == current_user.id).all()
     elif current_user.role == models.UserRole.MANAGER:
-        return db.query(models.LeaveRequest).filter(models.LeaveRequest.approver_id == current_user.id).all()
+        reportee_ids = [r.id for r in db.query(models.User).filter(models.User.manager_id == current_user.id).all()]
+        return db.query(models.LeaveRequest).filter(models.LeaveRequest.user_id.in_(reportee_ids)).all()
     return db.query(models.LeaveRequest).all()
 
-# Holidays
+@app.post("/api/leaves", response_model=schemas.LeaveRequest)
+def create_leave(leave_data: schemas.LeaveRequestCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    new_leave = models.LeaveRequest(
+        user_id=current_user.id,
+        start_date=leave_data.start_date,
+        end_date=leave_data.end_date,
+        leave_type=leave_data.leave_type,
+        reason=leave_data.reason,
+        status=models.LeaveStatus.PENDING
+    )
+    db.add(new_leave)
+    db.commit()
+    db.refresh(new_leave)
+    return new_leave
+
 @app.get("/api/holidays", response_model=List[schemas.Holiday])
-def get_holidays(db: Session = Depends(get_db)):
-    return db.query(models.Holiday).all()
+def get_holidays(year: Optional[int] = None, month: Optional[int] = None, db: Session = Depends(get_db)):
+    query = db.query(models.Holiday)
+    if year and month:
+        start_date = date(year, month, 1)
+        end_date = date(year + 1, 1, 1) if month == 12 else date(year, month + 1, 1)
+        query = query.filter(models.Holiday.date >= start_date, models.Holiday.date < end_date)
+    elif year:
+        query = query.filter(models.Holiday.date >= date(year, 1, 1), models.Holiday.date <= date(year, 12, 31))
+    return query.all()
+
+@app.get("/api/leave-balances", response_model=List[schemas.LeaveBalance])
+def get_leave_balances(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    return db.query(models.LeaveBalance).filter(models.LeaveBalance.user_id == current_user.id).all()

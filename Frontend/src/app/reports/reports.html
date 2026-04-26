@@ -1,0 +1,177 @@
+<div class="reports-container">
+  <header class="page-header">
+    <h1>Attendance Reports</h1>
+    <p class="subtitle">View and export attendance analytics</p>
+  </header>
+
+  <div class="reports-grid">
+    <section class="stats-row">
+      <div class="stat-card">
+        <div class="stat-icon present">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+        </div>
+        <div class="stat-info">
+          <span class="stat-value">{{ stats.present }}</span>
+          <span class="stat-label">Days Present</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon absent">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </div>
+        <div class="stat-info">
+          <span class="stat-value">{{ stats.absent }}</span>
+          <span class="stat-label">Days Absent</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon incomplete">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+          </svg>
+        </div>
+        <div class="stat-info">
+          <span class="stat-value">{{ stats.incomplete }}</span>
+          <span class="stat-label">Incomplete</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon hours">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2v4"></path>
+            <path d="M12 18v4"></path>
+            <path d="m4.93 4.93 2.83 2.83"></path>
+            <path d="m16.24 16.24 2.83 2.83"></path>
+            <path d="M2 12h4"></path>
+            <path d="M18 12h4"></path>
+          </svg>
+        </div>
+        <div class="stat-info">
+          <span class="stat-value">{{ stats.totalHours }}</span>
+          <span class="stat-label">Total Hours</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="chart-section">
+      <div class="card">
+        <div class="card-header">
+          <h2>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="20" x2="18" y2="10"></line>
+              <line x1="12" y1="20" x2="12" y2="4"></line>
+              <line x1="6" y1="20" x2="6" y2="14"></line>
+            </svg>
+            Weekly Summary
+          </h2>
+        </div>
+        <div class="chart-placeholder">
+          <div class="chart-bars">
+            @for (day of weekData; track day.label) {
+              <div class="bar-container">
+                <div class="bar" [style.height.%]="day.percentage" [class]="'bar-' + day.status"></div>
+                <span class="bar-label">{{ day.label }}</span>
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+              <line x1="16" y1="2" x2="16" y2="6"></line>
+              <line x1="8" y1="2" x2="8" y2="6"></line>
+              <line x1="3" y1="10" x2="21" y2="10"></line>
+            </svg>
+            Monthly Overview
+          </h2>
+        </div>
+        <div class="month-stats">
+          <div class="month-item">
+            <span class="month-label">Working Days</span>
+            <span class="month-value">{{ monthlyStats.workingDays }}</span>
+          </div>
+          <div class="month-item">
+            <span class="month-label">Present</span>
+            <span class="month-value success">{{ monthlyStats.present }}</span>
+          </div>
+          <div class="month-item">
+            <span class="month-label">Absent</span>
+            <span class="month-value danger">{{ monthlyStats.absent }}</span>
+          </div>
+          <div class="month-item">
+            <span class="month-label">On Leave</span>
+            <span class="month-value info">{{ monthlyStats.onLeave }}</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="attendance-table-section">
+      <div class="card">
+        <div class="card-header">
+          <h2>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
+            </svg>
+            Attendance History
+          </h2>
+          <div class="export-actions">
+            <button class="export-btn" (click)="exportPDF()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              Export PDF
+            </button>
+            <button class="export-btn" (click)="exportExcel()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              Export Excel
+            </button>
+          </div>
+        </div>
+        <table class="history-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Status</th>
+              <th>Punch In</th>
+              <th>Punch Out</th>
+              <th>Hours</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (record of attendanceHistory; track record.date) {
+              <tr [class]="'row-' + record.status.toLowerCase()">
+                <td>{{ record.date }}</td>
+                <td>
+                  <span class="status-badge" [class]="'badge-' + record.status.toLowerCase()">{{ record.status }}</span>
+                </td>
+                <td>{{ record.punchIn || '-' }}</td>
+                <td>{{ record.punchOut || '-' }}</td>
+                <td>{{ record.hours || '-' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+</div>

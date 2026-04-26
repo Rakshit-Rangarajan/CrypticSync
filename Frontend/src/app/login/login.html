@@ -1,58 +1,97 @@
-<div class="login-container">
-  <div class="glass-card">
-    <div class="logo-section">
-      <div class="logo-icon">CS</div>
-      <h1 class="company-name">CrypticSync</h1>
-      <p class="subtitle">Secure synchronization for your digital assets</p>
+<div class="login-wrapper">
+  <div class="login-container">
+    <div class="login-bg">
+      <div class="bg-gradient"></div>
+      <div class="bg-grid"></div>
     </div>
-
-    <form (ngSubmit)="onSubmit()" #loginForm="ngForm" class="login-form">
-      <div class="input-group">
-        <label for="username">Email or Employee ID</label>
-        <div class="input-wrapper">
-          <span class="icon">👤</span>
-          <input 
-            type="text" 
-            id="username" 
-            name="username" 
-            [(ngModel)]="username" 
-            placeholder="e.g. admin@crypticsync.com or EMP-1001"
-            required
-            autocomplete="username"
-          >
+    
+    <div class="login-card">
+      <div class="login-header">
+        <div class="logo-container">
+          <div class="logo-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+              <path d="M2 17l10 5 10-5"></path>
+              <path d="M2 12l10 5 10-5"></path>
+            </svg>
+          </div>
+          <h1 class="company-name">CrypticSync</h1>
         </div>
+        <p class="subtitle">Secure Employee Attendance Management</p>
       </div>
 
-      <div class="input-group">
-        <label for="password">Password</label>
-        <div class="input-wrapper">
-          <span class="icon">🔒</span>
-          <input 
-            type="password" 
-            id="password" 
-            name="password" 
-            [(ngModel)]="password" 
-            placeholder="Enter your password"
-            required
-            autocomplete="current-password"
-          >
+      <form (ngSubmit)="onSubmit()" #loginForm="ngForm" class="login-form">
+        <div class="input-group">
+          <label for="username">
+            <svg class="label-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+              <circle cx="12" cy="7" r="4"></circle>
+            </svg>
+            Email or Employee ID
+          </label>
+          <div class="input-wrapper">
+            <input 
+              type="text" 
+              id="username" 
+              name="username" 
+              [(ngModel)]="username" 
+              placeholder="Enter your email or employee ID"
+              required
+              autocomplete="username"
+            >
+          </div>
         </div>
-      </div>
 
-      <div *ngIf="error()" class="error-message">
-        {{ error() }}
-      </div>
+        <div class="input-group">
+          <label for="password">
+            <svg class="label-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+            </svg>
+            Password
+          </label>
+          <div class="input-wrapper">
+            <input 
+              type="password" 
+              id="password" 
+              name="password" 
+              [(ngModel)]="password" 
+              placeholder="Enter your password"
+              required
+              autocomplete="current-password"
+            >
+          </div>
+        </div>
 
-      <button type="submit" class="login-button" [disabled]="isLoading()">
-        <span *ngIf="!isLoading()">Login</span>
-        <span *ngIf="isLoading()" class="loader"></span>
-      </button>
+        @if (error()) {
+          <div class="error-message">
+            <svg class="error-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="8" x2="12" y2="12"></line>
+              <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+            {{ error() }}
+          </div>
+        }
 
-      <div class="footer-links">
-        <a href="#">Forgot Password?</a>
-        <span class="divider">|</span>
-        <a href="#">Request Access</a>
-      </div>
-    </form>
+        <button type="submit" class="login-button" [disabled]="isLoading()">
+          @if (!isLoading()) {
+            <span>Sign In</span>
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+              <polyline points="12 5 19 12 12 19"></polyline>
+            </svg>
+          } @else {
+            <div class="spinner"></div>
+          }
+        </button>
+
+        <div class="form-footer">
+          <a href="#" class="forgot-link">Forgot Password?</a>
+          <span class="divider">•</span>
+          <a href="#" class="request-link">Request Access</a>
+        </div>
+      </form>
+    </div>
   </div>
 </div>

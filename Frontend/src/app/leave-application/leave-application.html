@@ -1,0 +1,132 @@
+<div class="leave-container">
+  <header class="page-header">
+    <div class="header-content">
+      <button class="back-btn" (click)="goBack()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="19" y1="12" x2="5" y2="12"></line>
+          <polyline points="12 19 5 12 12 5"></polyline>
+        </svg>
+        Back to Dashboard
+      </button>
+      <h1>Leave Application</h1>
+      <p class="subtitle">Apply for time off or sick leave</p>
+    </div>
+  </header>
+
+  <div class="content-grid">
+    <section class="form-section">
+      <div class="card">
+        <div class="card-header">
+          <h2>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+            </svg>
+            New Leave Request
+          </h2>
+        </div>
+
+        <form (ngSubmit)="onSubmit()" class="leave-form">
+          <div class="form-group">
+            <label for="leaveType">Leave Type</label>
+            <select id="leaveType" [(ngModel)]="leaveType" name="leaveType" class="select-input" required>
+              <option value="">Select Leave Type</option>
+              <option value="SICK_LEAVE">Sick Leave</option>
+              <option value="PAID_LEAVE">Paid Leave</option>
+              <option value="PERSONAL_LEAVE">Personal Leave</option>
+              <option value="EMERGENCY_LEAVE">Emergency Leave</option>
+              <option value="WFH">Work From Home</option>
+            </select>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="startDate">Start Date</label>
+              <input type="date" id="startDate" [(ngModel)]="startDate" name="startDate" class="date-input" [min]="minDate" required>
+            </div>
+            <div class="form-group">
+              <label for="endDate">End Date</label>
+              <input type="date" id="endDate" [(ngModel)]="endDate" name="endDate" class="date-input" [min]="startDate || minDate" required>
+            </div>
+          </div>
+
+          <div class="duration-display" [class.visible]="duration > 0">
+            <span class="duration-label">Duration:</span>
+            <span class="duration-value">{{ duration }} day(s)</span>
+          </div>
+
+          <div class="form-group">
+            <label for="reason">Reason</label>
+            <textarea id="reason" [(ngModel)]="reason" name="reason" rows="4" placeholder="Provide a reason for your leave request..."></textarea>
+          </div>
+
+          <div class="balance-info" *ngIf="selectedBalance">
+            <div class="balance-header">
+              <span>Your {{ getLeaveTypeName(leaveType) }} Balance</span>
+              <span class="balance-value">{{ selectedBalance.used }}/{{ selectedBalance.total }}</span>
+            </div>
+            <div class="balance-bar">
+              <div class="balance-used" [style.width.%]="(selectedBalance.used / selectedBalance.total) * 100"></div>
+            </div>
+          </div>
+
+          <button type="submit" class="submit-btn" [disabled]="isSubmitting || !isFormValid()">
+            @if (!isSubmitting) {
+              <span>Submit Request</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+              </svg>
+            } @else {
+              <div class="spinner"></div>
+            }
+          </button>
+        </form>
+      </div>
+    </section>
+
+    <section class="info-section">
+      <div class="card">
+        <div class="card-header">
+          <h2>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+            </svg>
+            Leave Balances
+          </h2>
+        </div>
+        <div class="balance-grid">
+          @for (balance of leaveBalances; track balance.type) {
+            <div class="balance-item" [class.selected]="leaveType === balance.type" (click)="selectLeaveType(balance.type)">
+              <span class="balance-type">{{ balance.type }}</span>
+              <span class="balance-count">{{ balance.used }}/{{ balance.total }}</span>
+              <div class="balance-progress">
+                <div class="progress-fill" [style.width.%]="(balance.used / balance.total) * 100"></div>
+              </div>
+            </div>
+          }
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="8" x2="12" y2="12"></line>
+              <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+            Leave Policy
+          </h2>
+        </div>
+        <ul class="policy-list">
+          <li>Submit leave requests at least 3 days in advance</li>
+          <li>Sick leave requires medical certificate after 2 days</li>
+          <li>Emergency leave is limited to 3 days per quarter</li>
+          <li>Leave balance resets at the start of each year</li>
+        </ul>
+      </div>
+    </section>
+  </div>
+</div>

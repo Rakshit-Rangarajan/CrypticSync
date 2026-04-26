@@ -1,0 +1,98 @@
+<div class="contact-container">
+  <header class="page-header">
+    <h1>Contact HR</h1>
+    <p class="subtitle">Get in touch with the HR team for support</p>
+  </header>
+
+  <div class="contact-grid">
+    <section class="contact-form-section">
+      <div class="card">
+        <h2>Send a Message</h2>
+        <form class="contact-form">
+          <div class="form-group">
+            <label for="subject">Subject</label>
+            <select id="subject" [(ngModel)]="subject" name="subject" class="select-input">
+              <option value="">Select a topic</option>
+              <option value="attendance">Attendance Issue</option>
+              <option value="leave">Leave Related</option>
+              <option value="policy">Policy Question</option>
+              <option value="technical">Technical Support</option>
+              <option value="feedback">Feedback</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="message">Message</label>
+            <textarea id="message" [(ngModel)]="message" name="message" rows="6" placeholder="Describe your issue or question..."></textarea>
+          </div>
+          <button type="button" class="submit-btn" [disabled]="!message || !subject" (click)="sendMessage()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
+            Send Message
+          </button>
+        </form>
+      </div>
+    </section>
+
+    <section class="contact-info-section">
+      <div class="card">
+        <h2>HR Contacts</h2>
+        <div class="contact-list">
+          <div class="contact-person">
+            <div class="person-avatar">SK</div>
+            <div class="person-info">
+              <span class="person-name">Sarah Kumar</span>
+              <span class="person-role">HR Manager</span>
+              <span class="person-email">hr@crypticsync.com</span>
+            </div>
+          </div>
+          <div class="contact-person">
+            <div class="person-avatar">RP</div>
+            <div class="person-info">
+              <span class="person-name">Rajesh Patel</span>
+              <span class="person-role">HR Executive</span>
+              <span class="person-email">rajesh@crypticsync.com</span>
+            </div>
+          </div>
+          <div class="contact-person">
+            <div class="person-avatar">PM</div>
+            <div class="person-info">
+              <span class="person-name">Priya Menon</span>
+              <span class="person-role">Payroll Specialist</span>
+              <span class="person-email">payroll@crypticsync.com</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Quick Help</h2>
+        <div class="help-links">
+          <a href="#" class="help-link">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+            </svg>
+            <span>Employee Handbook</span>
+          </a>
+          <a href="#" class="help-link">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+              <line x1="12" y1="17" x2="12.01" y2="17"></line>
+            </svg>
+            <span>FAQ</span>
+          </a>
+          <a href="#" class="help-link">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+            </svg>
+            <span>Live Chat</span>
+          </a>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>

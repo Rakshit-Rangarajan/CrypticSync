@@ -1,0 +1,166 @@
+<div class="regularization-container">
+  <header class="page-header">
+    <div class="header-content">
+      <button class="back-btn" (click)="goBack()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="19" y1="12" x2="5" y2="12"></line>
+          <polyline points="12 19 5 12 12 5"></polyline>
+        </svg>
+        Back to Dashboard
+      </button>
+      <h1>Attendance Regularization</h1>
+      <p class="date-info">{{ formattedDate }}</p>
+    </div>
+  </header>
+
+  <div class="content-grid">
+    <section class="form-section">
+      <div class="card">
+        <div class="card-header">
+          <h2>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+            {{ isPastDate ? 'Regularize Missing Attendance' : 'Mark Attendance' }}
+          </h2>
+        </div>
+
+        @if (isFutureDate) {
+          <div class="info-box warning">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="8" x2="12" y2="12"></line>
+              <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+            <p>You cannot regularize future dates. Attendance can only be marked for today or past dates.</p>
+          </div>
+        } @else {
+          <form (ngSubmit)="onSubmit()" class="regularization-form">
+            <div class="form-group">
+              <label>Status</label>
+              <div class="radio-group">
+                <label class="radio-option" [class.selected]="selectedStatus() === 'PRESENT'">
+                  <input type="radio" name="status" value="PRESENT" [ngModel]="selectedStatus()" (ngModelChange)="selectedStatus.set($event)">
+                  <span class="radio-label">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    Present
+                  </span>
+                </label>
+                <label class="radio-option" [class.selected]="selectedStatus() === 'ABSENT'">
+                  <input type="radio" name="status" value="ABSENT" [ngModel]="selectedStatus()" (ngModelChange)="selectedStatus.set($event)">
+                  <span class="radio-label">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <line x1="18" y1="6" x2="6" y2="18"></line>
+                      <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                    Absent
+                  </span>
+                </label>
+                <label class="radio-option" [class.selected]="selectedStatus() === 'LEAVE'">
+                  <input type="radio" name="status" value="LEAVE" [ngModel]="selectedStatus()" (ngModelChange)="selectedStatus.set($event)">
+                  <span class="radio-label">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                      <polyline points="14 2 14 8 20 8"></polyline>
+                    </svg>
+                    Leave
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            @if (selectedStatus() === 'PRESENT') {
+              <div class="form-group">
+                <label for="punchIn">Punch In Time</label>
+                <input type="time" id="punchIn" [ngModel]="punchInTime()" (ngModelChange)="punchInTime.set($event)" name="punchIn" class="time-input">
+              </div>
+              <div class="form-group">
+                <label for="punchOut">Punch Out Time</label>
+                <input type="time" id="punchOut" [ngModel]="punchOutTime()" (ngModelChange)="punchOutTime.set($event)" name="punchOut" class="time-input">
+              </div>
+            }
+
+            @if (selectedStatus() === 'LEAVE') {
+              <div class="form-group">
+                <label for="leaveType">Leave Type</label>
+                <select id="leaveType" [ngModel]="leaveType()" (ngModelChange)="leaveType.set($event)" name="leaveType" class="select-input">
+                  <option value="">Select Leave Type</option>
+                  <option value="SICK_LEAVE">Sick Leave</option>
+                  <option value="PAID_LEAVE">Paid Leave</option>
+                  <option value="PERSONAL_LEAVE">Personal Leave</option>
+                  <option value="EMERGENCY_LEAVE">Emergency Leave</option>
+                </select>
+              </div>
+            }
+
+            <div class="form-group">
+              <label for="reason">Reason / Notes</label>
+              <textarea id="reason" [ngModel]="reason()" (ngModelChange)="reason.set($event)" name="reason" rows="4" placeholder="Provide a reason for regularization..."></textarea>
+            </div>
+
+            <button type="submit" class="submit-btn" [disabled]="isSubmitting()">
+              @if (!isSubmitting()) {
+                <span>Submit Regularization</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              } @else {
+                <div class="spinner"></div>
+              }
+            </button>
+          </form>
+        }
+      </div>
+    </section>
+
+    <section class="info-section">
+      <div class="card">
+        <div class="card-header">
+          <h2>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="16" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+            Guidelines
+          </h2>
+        </div>
+        <ul class="guidelines-list">
+          <li>Submit regularization requests within 48 hours of the absence</li>
+          <li>Provide valid reasons and supporting documents if available</li>
+          <li>Leave requests require manager approval</li>
+          <li>Incomplete attendance (< 8 hours) will be marked as partial</li>
+          <li>Repeated irregularities may require additional documentation</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+            </svg>
+            Recent Requests
+          </h2>
+        </div>
+        <div class="recent-list">
+          @for (request of recentRequests(); track request.id) {
+            <div class="recent-item" [class]="'status-' + request.status.toLowerCase()">
+              <div class="request-info">
+                <span class="request-date">{{ request.startDate }}</span>
+                <span class="request-type">{{ request.leaveType }}</span>
+              </div>
+              <span class="request-status">{{ request.status }}</span>
+            </div>
+          } @empty {
+            <p class="empty-text">No recent requests</p>
+          }
+        </div>
+      </div>
+    </section>
+  </div>
+</div>

@@ -1,0 +1,166 @@
+<div class="settings-container">
+  <header class="page-header">
+    <h1>Settings</h1>
+    <p class="subtitle">Manage your account and preferences</p>
+  </header>
+
+  <div class="settings-grid">
+    <section class="settings-nav">
+      <button class="nav-item" [class.active]="activeSection === 'profile'" (click)="activeSection = 'profile'">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+          <circle cx="12" cy="7" r="4"></circle>
+        </svg>
+        Profile
+      </button>
+      <button class="nav-item" [class.active]="activeSection === 'notifications'" (click)="activeSection = 'notifications'">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+          <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+        </svg>
+        Notifications
+      </button>
+      <button class="nav-item" [class.active]="activeSection === 'security'" (click)="activeSection = 'security'">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+        </svg>
+        Security
+      </button>
+      <button class="nav-item" [class.active]="activeSection === 'preferences'" (click)="activeSection = 'preferences'">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+        Preferences
+      </button>
+    </section>
+
+    <section class="settings-content">
+      @if (activeSection === 'profile') {
+        <div class="card">
+          <h2>Profile Information</h2>
+          <div class="profile-header">
+            <div class="avatar-upload">
+              <div class="avatar-preview">JD</div>
+              <button class="upload-btn">Change Photo</button>
+            </div>
+          </div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Full Name</label>
+              <input type="text" value="John Doe" class="input-field">
+            </div>
+            <div class="form-group">
+              <label>Employee ID</label>
+              <input type="text" value="EMP-1001" class="input-field" disabled>
+            </div>
+            <div class="form-group">
+              <label>Email</label>
+              <input type="email" value="john@crypticsync.com" class="input-field">
+            </div>
+            <div class="form-group">
+              <label>Department</label>
+              <input type="text" value="Engineering" class="input-field">
+            </div>
+            <div class="form-group">
+              <label>Designation</label>
+              <input type="text" value="Software Engineer" class="input-field">
+            </div>
+            <div class="form-group">
+              <label>Phone</label>
+              <input type="tel" placeholder="+91 98765 43210" class="input-field">
+            </div>
+          </div>
+          <button class="save-btn">Save Changes</button>
+        </div>
+      }
+
+      @if (activeSection === 'notifications') {
+        <div class="card">
+          <h2>Notification Preferences</h2>
+          <div class="notification-list">
+            <div class="notification-item">
+              <div class="notification-info">
+                <span class="notification-title">Email Notifications</span>
+                <span class="notification-desc">Receive attendance updates via email</span>
+              </div>
+              <label class="toggle-switch">
+                <input type="checkbox" checked>
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="notification-item">
+              <div class="notification-info">
+                <span class="notification-title">Leave Reminders</span>
+                <span class="notification-desc">Get reminded about pending leave requests</span>
+              </div>
+              <label class="toggle-switch">
+                <input type="checkbox" checked>
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="notification-item">
+              <div class="notification-info">
+                <span class="notification-title">Report Digest</span>
+                <span class="notification-desc">Weekly attendance summary emails</span>
+              </div>
+              <label class="toggle-switch">
+                <input type="checkbox">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+      }
+
+      @if (activeSection === 'security') {
+        <div class="card">
+          <h2>Security Settings</h2>
+          <div class="security-section">
+            <h3>Change Password</h3>
+            <div class="form-group">
+              <label>Current Password</label>
+              <input type="password" class="input-field">
+            </div>
+            <div class="form-group">
+              <label>New Password</label>
+              <input type="password" class="input-field">
+            </div>
+            <div class="form-group">
+              <label>Confirm New Password</label>
+              <input type="password" class="input-field">
+            </div>
+            <button class="save-btn">Update Password</button>
+          </div>
+          <div class="security-section">
+            <h3>Two-Factor Authentication</h3>
+            <p class="security-note">Add an extra layer of security to your account</p>
+            <button class="secondary-btn">Enable 2FA</button>
+          </div>
+        </div>
+      }
+
+      @if (activeSection === 'preferences') {
+        <div class="card">
+          <h2>Appearance</h2>
+          <div class="preference-item">
+            <span class="preference-label">Theme</span>
+            <div class="theme-options">
+              <button class="theme-btn" [class.active]="theme === 'dark'" (click)="theme = 'dark'">Dark</button>
+              <button class="theme-btn" [class.active]="theme === 'light'" (click)="theme = 'light'">Light</button>
+              <button class="theme-btn" [class.active]="theme === 'system'" (click)="theme = 'system'">System</button>
+            </div>
+          </div>
+          <div class="preference-item">
+            <span class="preference-label">Time Zone</span>
+            <select class="select-input">
+              <option>Asia/Kolkata (IST)</option>
+              <option>UTC</option>
+            </select>
+          </div>
+        </div>
+      }
+    </section>
+  </div>
+</div>

@@ -1,88 +1,289 @@
-<div class="app-container">
-    <!-- Stats Header -->
-    <div class="stats-grid">
-        <div class="stat-card total">
-            <div class="stat-info">
-                <span class="label">Total Users</span>
-                <h2 class="value">{{ totalUsers() }}</h2>
-            </div>
-            <div class="stat-icon">👥</div>
-        </div>
-        <div class="stat-card present">
-            <div class="stat-info">
-                <span class="label">Present Today</span>
-                <h2 class="value">{{ presentCount() }}</h2>
-            </div>
-            <div class="stat-icon">✅</div>
-        </div>
-        <div class="stat-card absent">
-            <div class="stat-info">
-                <span class="label">Absent</span>
-                <h2 class="value">{{ absentCount() }}</h2>
-            </div>
-            <div class="stat-icon">❌</div>
-        </div>
+<div class="dashboard-container">
+  <header class="dashboard-header">
+    <div class="header-left">
+      <h1 class="greeting">Good Morning, {{ currentUser()?.name || 'User' }}</h1>
+      <p class="date-display">{{ today | date:'EEEE, MMMM d, y' }}</p>
     </div>
-
-    <!-- Main Content -->
-    <div class="glass-panel main-panel">
-        <div class="panel-header">
-            <div>
-                <h2>Attendance Tracking</h2>
-                <p class="subtitle">{{ selectedDate() }}</p>
-            </div>
-            <div class="actions">
-                <input type="date" [ngModel]="selectedDate()" (ngModelChange)="selectedDate.set($event); loadData()" class="date-picker">
-                <button (click)="addEmployee()" class="btn-primary">Manage Users</button>
-            </div>
+    <div class="header-right">
+      <div class="quick-stats">
+        <div class="quick-stat">
+          <span class="stat-value">{{ getStatusCount('PRESENT') }}</span>
+          <span class="stat-label">Days Present</span>
         </div>
+        <div class="quick-stat">
+          <span class="stat-value">{{ getPendingLeaves().length }}</span>
+          <span class="stat-label">Pending Leaves</span>
+        </div>
+      </div>
+    </div>
+  </header>
 
-        <div class="table-container">
-            @if (isLoading()) {
-            <div class="loading-overlay">
-                <div class="spinner"></div>
-                <p>Updating database...</p>
-            </div>
+  <div class="dashboard-grid">
+    <section class="widget calendar-widget">
+      <div class="widget-header">
+        <h2 class="widget-title">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>
+          Attendance Calendar
+        </h2>
+        <div class="month-nav">
+          <button class="nav-btn" (click)="previousMonth()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg>
+          </button>
+          <span class="month-name">{{ getMonthName() }}</span>
+          <button class="nav-btn" (click)="nextMonth()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="9 18 15 12 9 6"></polyline>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="calendar-grid">
+        <div class="weekday-header" *ngFor="let day of weekDays">{{ day }}</div>
+        <div
+          *ngFor="let day of calendarDays()"
+          class="calendar-day"
+          [class.other-month]="!day.isCurrentMonth"
+          [class.today]="day.isToday"
+          [class.weekend]="day.isWeekend"
+          [class.status-present]="getDayStatus(day) === 'PRESENT'"
+          [class.status-absent]="getDayStatus(day) === 'ABSENT'"
+          [class.status-holiday]="getDayStatus(day) === 'HOLIDAY'"
+          [class.status-leave]="getDayStatus(day) === 'LEAVE'"
+          [class.status-incomplete]="getDayStatus(day) === 'INCOMPLETE'"
+          [class.status-not-recorded]="getDayStatus(day) === 'NOT_RECORDED'"
+          [class.clickable]="day.isCurrentMonth && !day.isWeekend"
+          (click)="onDateClick(day)"
+          [title]="getDayTooltip(day)"
+        >
+          <span class="day-number">{{ day.day }}</span>
+          <div class="day-indicator"></div>
+        </div>
+      </div>
+
+      <div class="calendar-legend">
+        <div class="legend-item">
+          <span class="legend-dot present"></span>
+          <span>Present</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-dot absent"></span>
+          <span>Absent</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-dot approved-leave"></span>
+          <span>Approved Leave</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-dot holiday"></span>
+          <span>Holiday</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-dot incomplete"></span>
+          <span>Incomplete</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-dot not-recorded"></span>
+          <span>Not Recorded</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="widget holidays-widget">
+      <div class="widget-header">
+        <h2 class="widget-title">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+          </svg>
+          Holidays - {{ currentMonth() | date:'MMMM yyyy' }}
+        </h2>
+      </div>
+      <div class="holidays-list">
+        @for (holiday of getMonthHolidays(); track holiday.id) {
+        <div class="holiday-item">
+          <div class="holiday-date">
+            <span class="day">{{ holiday.date.split('-')[2] }}</span>
+            <span class="month">{{ holiday.date.split('-')[1] }}</span>
+          </div>
+          <div class="holiday-info">
+            <h4>{{ holiday.name }}</h4>
+            <p>{{ holiday.description }}</p>
+          </div>
+        </div>
+        } @empty {
+        <div class="empty-state">
+          <p>No holidays this month</p>
+        </div>
+        }
+      </div>
+    </section>
+
+    <section class="widget leaves-widget">
+      <div class="widget-header">
+        <h2 class="widget-title">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+          </svg>
+          My Leave Balance
+        </h2>
+        <a routerLink="/leave" class="request-btn">Request Leave</a>
+      </div>
+
+      <div class="leave-balance-grid">
+        @for (summary of leaveSummary(); track summary.type) {
+        <div class="leave-type-card" [style.--accent-color]="summary.color">
+          <div class="leave-type-header">
+            <span class="leave-type-name">{{ summary.type }}</span>
+            <span class="leave-count">{{ summary.used }}/{{ summary.total }}</span>
+          </div>
+          <div class="leave-progress">
+            <div class="progress-bar" [style.width.%]="(summary.used / summary.total) * 100"></div>
+          </div>
+        </div>
+        }
+      </div>
+
+      <div class="recent-leaves">
+        <h3>Recent Leave Requests</h3>
+        @for (leave of leaves(); track leave.id) {
+        <div class="leave-request-item" [class.pending]="leave.status === 'PENDING'" [class.approved]="leave.status === 'APPROVED'">
+          <div class="leave-info">
+            <span class="leave-type">{{ leave.leaveType }}</span>
+            <span class="leave-dates">{{ leave.startDate }} - {{ leave.endDate }}</span>
+          </div>
+          <span class="leave-status" [class]="'status-' + leave.status.toLowerCase()">{{ leave.status }}</span>
+        </div>
+        } @empty {
+        <div class="empty-state">
+          <p>No leave requests</p>
+        </div>
+        }
+      </div>
+    </section>
+
+    @if (isManager()) {
+    <section class="widget reportees-widget">
+      <div class="widget-header">
+        <h2 class="widget-title">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+          </svg>
+          Team Attendance - This Week
+        </h2>
+      </div>
+
+      <div class="reportees-table-wrapper">
+        <table class="reportees-table">
+          <thead>
+            <tr>
+              <th class="employee-col">Employee</th>
+              @for (date of currentWeekDates(); track date) {
+              <th [class.weekend-col]="date.getDay() === 0 || date.getDay() === 6">
+                <span class="weekday">{{ date | date:'EEE' }}</span>
+                <span class="day-num">{{ date.getDate() }}</span>
+              </th>
+              }
+            </tr>
+          </thead>
+          <tbody>
+            @for (reporteeData of reporteesAttendance(); track reporteeData.user.id) {
+            <tr>
+              <td class="employee-col">
+                <div class="employee-info">
+                  <div class="avatar">{{ reporteeData.user.name.charAt(0) }}</div>
+                  <div class="employee-details">
+                    <span class="name">{{ reporteeData.user.name }}</span>
+                    <span class="dept">{{ reporteeData.user.department }}</span>
+                  </div>
+                </div>
+              </td>
+              @for (date of currentWeekDates(); track date) {
+              <td class="attendance-col" [class.weekend-col]="date.getDay() === 0 || date.getDay() === 6">
+                @if (date.getDay() === 0 || date.getDay() === 6) {
+                <span class="weekend-indicator">-</span>
+                } @else {
+                <span
+                  class="attendance-status"
+                  [style.color]="getAttendanceColor(reporteeData.user.id, date)"
+                  [title]="getReporteeAttendanceForDate(reporteeData.user.id, date)?.status || 'No record'"
+                >{{ getAttendanceIcon(reporteeData.user.id, date) }}</span>
+                }
+              </td>
+              }
+            </tr>
             }
+          </tbody>
+        </table>
+      </div>
 
-            <table class="attendance-table">
-                <thead>
-                    <tr>
-                        <th>User</th>
-                        <th>Department</th>
-                        <th>Status</th>
-                        <th>Action</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @for (user of users(); track user.id) {
-                    <tr [class.present-row]="isUserPresent(user.id)">
-                        <td>
-                            <div class="emp-name">
-                                <div class="avatar">{{ user.name.charAt(0) }}</div>
-                                <span>{{ user.name }}</span>
-                            </div>
-                        </td>
-                        <td>{{ user.department || 'N/A' }}</td>
-                        <td>
-                            <span class="badge" [class.present]="isUserPresent(user.id)"
-                                [class.absent]="!isUserPresent(user.id)">
-                                {{ isUserPresent(user.id) ? 'Present' : 'Absent' }}
-                            </span>
-                        </td>
-                        <td>
-                            <button (click)="toggleAttendance(user)" class="btn-toggle">
-                                {{ isUserPresent(user.id) ? 'Mark Absent' : 'Mark Present' }}
-                            </button>
-                        </td>
-                    </tr>
-                    } @empty {
-                    <tr>
-                        <td colspan="4" class="empty-msg">No users found.</td>
-                    </tr>
-                    }
-                </tbody>
-            </table>
+      <div class="reportees-summary">
+        <div class="summary-item">
+          <span class="summary-label">Present:</span>
+          <span class="summary-value present">{{ presentCount() }}</span>
         </div>
-    </div>
-</div>
+        <div class="summary-item">
+          <span class="summary-label">Absent:</span>
+          <span class="summary-value absent">{{ absentCount() }}</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">Total Reportees:</span>
+          <span class="summary-value">{{ reportees().length }}</span>
+        </div>
+      </div>
+    </section>
+    }
+
+    <section class="widget quick-actions-widget">
+      <h2 class="widget-title">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+        </svg>
+        Quick Actions
+      </h2>
+      <div class="actions-grid">
+        <a routerLink="/leave" class="action-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+          </svg>
+          <span>Apply for Leave</span>
+        </a>
+        <a routerLink="/reports" class="action-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="20" x2="18" y2="10"></line>
+            <line x1="12" y1="20" x2="12" y2="4"></line>
+            <line x1="6" y1="20" x2="6" y2="14"></line>
+          </svg>
+          <span>View Reports</span>
+        </a>
+        <a routerLink="/contact-hr" class="action-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+          </svg>
+          <span>Contact HR</span>
+        </a>
+        <a routerLink="/settings" class="action-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+          <span>Settings</span>
+        </a>
+      </div>
+    </section>
+  </div>
+</div>

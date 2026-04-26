@@ -1,7 +1,8 @@
-import { Component, signal } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { NavbarComponent } from './navbar/navbar';
 import { FooterComponent } from './footer/footer';
+import { AuthService } from './auth.service';
 
 @Component({
   selector: 'app-root',
@@ -11,5 +12,5 @@ import { FooterComponent } from './footer/footer';
   styleUrl: './app.css'
 })
 export class App {
-  protected readonly title = signal('AttendanceHub');
+  authService = inject(AuthService);
 }
