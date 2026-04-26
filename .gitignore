@@ -13,6 +13,7 @@ Backend/*.pyc
 Backend/*.db
 Backend/instance/
 Backend/.pytest_cache/
+Backend/.env
 
 # IDEs
 .vscode/
