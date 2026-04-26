@@ -10,6 +10,7 @@
   width: 100%;
   max-width: 1600px;
   margin: 0 auto;
+  box-sizing: border-box;
 }
 
 .auth-container {
@@ -17,6 +18,8 @@
   display: flex;
   justify-content: center;
   align-items: center;
+  min-height: 100vh;
+  width: 100%;
 }
 
 @media (max-width: 768px) {

@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, date, time
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
@@ -74,6 +74,96 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
     if user is None:
         raise credentials_exception
     return user
+
+import json
+import os
+
+def init_db(db: Session):
+    # Only seed if the database is empty
+    if db.query(models.User).first():
+        return
+
+    data_path = os.path.join(os.path.dirname(__file__), "initial_data.json")
+    if not os.path.exists(data_path):
+        print(f"Warning: {data_path} not found. Skipping initialization.")
+        return
+
+    with open(data_path, "r") as f:
+        data = json.load(f)
+
+    # 1. Create Teams
+    teams = {}
+    for t in data.get("teams", []):
+        team = models.Team(name=t["name"], department=t["department"])
+        db.add(team)
+        db.flush()
+        teams[t["name"]] = team
+
+    # 2. Create Users
+    users_by_emp_id = {}
+    for u in data.get("users", []):
+        user = models.User(
+            employee_id=u["employee_id"],
+            name=u["name"],
+            email=u["email"],
+            hashed_password=get_password_hash(u["password"]),
+            department=u["department"],
+            designation=u["designation"],
+            role=models.UserRole(u["role"]),
+            joining_date=date.fromisoformat(u["joining_date"]),
+            is_active=True
+        )
+        if u.get("team_name"):
+            user.team_id = teams[u["team_name"]].id
+        
+        db.add(user)
+        db.flush()
+        users_by_emp_id[u["employee_id"]] = user
+
+        # Seed initial Leave Balances
+        for lt in models.LeaveType:
+            if lt != models.LeaveType.WFH:
+                balance = models.LeaveBalance(user_id=user.id, leave_type=lt, total_days=12, used_days=0)
+                db.add(balance)
+
+    # 3. Set Manager Relationships
+    for u in data.get("users", []):
+        if u.get("manager_employee_id"):
+            db_user = users_by_emp_id[u["employee_id"]]
+            db_user.manager_id = users_by_emp_id[u["manager_employee_id"]].id
+            db.add(db_user)
+
+    # 4. Create Holidays
+    for h in data.get("holidays", []):
+        holiday = models.Holiday(
+            date=date.fromisoformat(h["date"]),
+            holiday_name=h["name"],
+            description=h["description"],
+            is_optional=h["is_optional"]
+        )
+        db.add(holiday)
+    
+    # 5. Create Welcome Notifications
+    for user in db.query(models.User).all():
+        notif = models.Notification(
+            user_id=user.id,
+            title="Welcome to CrypticSync!",
+            message=f"Hello {user.name}, your enterprise dashboard is now active.",
+            type="info",
+            is_read=False
+        )
+        db.add(notif)
+    
+    db.commit()
+    print("Database initialized successfully from initial_data.json")
+
+@app.on_event("startup")
+def on_startup():
+    db = SessionLocal()
+    try:
+        init_db(db)
+    finally:
+        db.close()
 
 @app.get("/")
 def read_root(db: Session = Depends(get_db)):
@@ -160,6 +250,15 @@ def get_attendance(date: Optional[date] = None, db: Session = Depends(get_db), c
 
 @app.post("/api/attendance", response_model=schemas.Attendance)
 def mark_attendance(attendance_data: schemas.AttendanceCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    # Regularization logic
+    today = date.today()
+    if attendance_data.date > today:
+        raise HTTPException(status_code=400, detail="Cannot regularize future dates.")
+    
+    user = db.query(models.User).filter(models.User.id == attendance_data.user_id).first()
+    if user and user.joining_date and attendance_data.date < user.joining_date:
+        raise HTTPException(status_code=400, detail=f"Cannot regularize dates before joining date ({user.joining_date}).")
+
     existing = db.query(models.Attendance).filter(
         models.Attendance.user_id == attendance_data.user_id,
         models.Attendance.date == attendance_data.date
@@ -187,6 +286,114 @@ def mark_attendance(attendance_data: schemas.AttendanceCreate, db: Session = Dep
     db.refresh(new_record)
     return new_record
 
+@app.post("/api/attendance/punch-in", response_model=schemas.Attendance)
+def punch_in(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    today = date.today()
+    now = datetime.now()
+    existing = db.query(models.Attendance).filter(
+        models.Attendance.user_id == current_user.id,
+        models.Attendance.date == today
+    ).first()
+    
+    if existing and existing.punch_in:
+        raise HTTPException(status_code=400, detail="Already punched in for today.")
+    
+    if existing:
+        existing.punch_in = now
+        existing.last_action_time = now
+        existing.status = models.AttendanceStatus.WFH
+    else:
+        existing = models.Attendance(
+            user_id=current_user.id,
+            date=today,
+            punch_in=now,
+            last_action_time=now,
+            status=models.AttendanceStatus.WFH
+        )
+        db.add(existing)
+    
+    db.commit()
+    db.refresh(existing)
+    return existing
+
+@app.post("/api/attendance/pause", response_model=schemas.Attendance)
+def pause_attendance(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    today = date.today()
+    now = datetime.now()
+    record = db.query(models.Attendance).filter(
+        models.Attendance.user_id == current_user.id,
+        models.Attendance.date == today
+    ).first()
+    
+    if not record or not record.punch_in or record.punch_out:
+        raise HTTPException(status_code=400, detail="No active session to pause.")
+    
+    if record.is_paused:
+        raise HTTPException(status_code=400, detail="Already paused.")
+    
+    # Calculate worked time since last start/resume
+    if record.last_action_time:
+        diff = (now - record.last_action_time).total_seconds()
+        record.total_worked_seconds += int(diff)
+    
+    record.is_paused = True
+    record.last_action_time = now
+    db.commit()
+    db.refresh(record)
+    return record
+
+@app.post("/api/attendance/resume", response_model=schemas.Attendance)
+def resume_attendance(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    today = date.today()
+    now = datetime.now()
+    record = db.query(models.Attendance).filter(
+        models.Attendance.user_id == current_user.id,
+        models.Attendance.date == today
+    ).first()
+    
+    if not record or not record.is_paused:
+        raise HTTPException(status_code=400, detail="Not paused.")
+    
+    record.is_paused = False
+    record.last_action_time = now
+    db.commit()
+    db.refresh(record)
+    return record
+
+@app.post("/api/attendance/punch-out", response_model=schemas.Attendance)
+def punch_out(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    today = date.today()
+    now = datetime.now()
+    record = db.query(models.Attendance).filter(
+        models.Attendance.user_id == current_user.id,
+        models.Attendance.date == today
+    ).first()
+    
+    if not record or not record.punch_in:
+        raise HTTPException(status_code=400, detail="Must punch in first.")
+    
+    if record.punch_out:
+        raise HTTPException(status_code=400, detail="Already punched out for today.")
+    
+    # Final calculation if not paused
+    if not record.is_paused and record.last_action_time:
+        diff = (now - record.last_action_time).total_seconds()
+        record.total_worked_seconds += int(diff)
+    
+    record.punch_out = now
+    record.total_hours = record.total_worked_seconds / 3600
+    
+    if record.total_hours < 4:
+        record.status = models.AttendanceStatus.ABSENT
+    elif record.total_hours < 8:
+        record.status = models.AttendanceStatus.PARTIAL
+    else:
+        record.status = models.AttendanceStatus.PRESENT
+    
+    db.commit()
+    db.refresh(record)
+    return record
+
 @app.get("/api/leaves/me", response_model=List[schemas.LeaveRequest])
 def get_my_leaves(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     return db.query(models.LeaveRequest).filter(models.LeaveRequest.user_id == current_user.id).all()
@@ -202,6 +409,17 @@ def get_leaves(db: Session = Depends(get_db), current_user: models.User = Depend
 
 @app.post("/api/leaves", response_model=schemas.LeaveRequest)
 def create_leave(leave_data: schemas.LeaveRequestCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    # Check for holidays in range
+    holidays = db.query(models.Holiday).filter(
+        models.Holiday.date >= leave_data.start_date,
+        models.Holiday.date <= leave_data.end_date,
+        models.Holiday.is_optional == False
+    ).all()
+    
+    if holidays:
+        holiday_list = ", ".join([h.holiday_name for h in holidays])
+        raise HTTPException(status_code=400, detail=f"Cannot apply leave on company holidays: {holiday_list}")
+
     new_leave = models.LeaveRequest(
         user_id=current_user.id,
         start_date=leave_data.start_date,
@@ -226,6 +444,115 @@ def get_holidays(year: Optional[int] = None, month: Optional[int] = None, db: Se
         query = query.filter(models.Holiday.date >= date(year, 1, 1), models.Holiday.date <= date(year, 12, 31))
     return query.all()
 
+# Team Management (Admin Only)
+# User Management (Admin Only)
+@app.get("/api/users", response_model=List[schemas.User])
+def get_users(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    if current_user.role not in [models.UserRole.ADMIN, models.UserRole.CTO]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    return db.query(models.User).all()
+
+@app.post("/api/users", response_model=schemas.User)
+def create_user(user: schemas.UserCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    if current_user.role not in [models.UserRole.ADMIN, models.UserRole.CTO]:
+        raise HTTPException(status_code=403, detail="Only admins can create users.")
+    
+    db_user = db.query(models.User).filter(models.User.email == user.email).first()
+    if db_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    hashed_pwd = get_password_hash(user.password)
+    db_user = models.User(
+        employee_id=user.employee_id,
+        name=user.name,
+        email=user.email,
+        hashed_password=hashed_pwd,
+        department=user.department,
+        designation=user.designation,
+        role=user.role,
+        team_id=user.team_id,
+        manager_id=user.manager_id,
+        joining_date=user.joining_date
+    )
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    
+    # Initialize leave balances
+    for lt in models.LeaveType:
+        if lt != models.LeaveType.WFH:
+            balance = models.LeaveBalance(user_id=db_user.id, leave_type=lt, total_days=12, used_days=0)
+            db.add(balance)
+    db.commit()
+    
+    return db_user
+
+@app.delete("/api/users/{user_id}")
+def delete_user(user_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    if current_user.role != models.UserRole.ADMIN:
+        raise HTTPException(status_code=403, detail="Only admins can delete users.")
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    db.delete(user)
+    db.commit()
+    return {"message": "User deleted"}
+
+@app.post("/api/teams", response_model=schemas.Team)
+def create_team(team: schemas.TeamCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    if current_user.role != models.UserRole.ADMIN:
+        raise HTTPException(status_code=403, detail="Only admins can create teams.")
+    db_team = models.Team(**team.model_dump())
+    db.add(db_team)
+    db.commit()
+    db.refresh(db_team)
+    return db_team
+
+# Holiday Management (Admin Only)
+@app.post("/api/holidays", response_model=schemas.Holiday)
+def create_holiday(holiday: schemas.HolidayBase, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    if current_user.role != models.UserRole.ADMIN:
+        raise HTTPException(status_code=403, detail="Only admins can manage holidays.")
+    db_holiday = models.Holiday(
+        date=holiday.date,
+        holiday_name=holiday.holiday_name,
+        description=holiday.description,
+        is_optional=holiday.is_optional
+    )
+    db.add(db_holiday)
+    db.commit()
+    db.refresh(db_holiday)
+    return db_holiday
+
+@app.delete("/api/holidays/{holiday_id}")
+def delete_holiday(holiday_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    if current_user.role != models.UserRole.ADMIN:
+        raise HTTPException(status_code=403, detail="Only admins can manage holidays.")
+    db_holiday = db.query(models.Holiday).filter(models.Holiday.id == holiday_id).first()
+    if not db_holiday:
+        raise HTTPException(status_code=404, detail="Holiday not found")
+    db.delete(db_holiday)
+    db.commit()
+    return {"message": "Holiday deleted"}
+
+# Leave Balances
 @app.get("/api/leave-balances", response_model=List[schemas.LeaveBalance])
 def get_leave_balances(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     return db.query(models.LeaveBalance).filter(models.LeaveBalance.user_id == current_user.id).all()
+
+# Notifications
+@app.get("/api/notifications", response_model=List[schemas.Notification])
+def get_notifications(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    return db.query(models.Notification).filter(models.Notification.user_id == current_user.id).order_by(models.Notification.created_at.desc()).all()
+
+@app.post("/api/notifications/{notification_id}/read")
+def mark_notification_read(notification_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    notification = db.query(models.Notification).filter(
+        models.Notification.id == notification_id,
+        models.Notification.user_id == current_user.id
+    ).first()
+    if not notification:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    notification.is_read = True
+    db.commit()
+    return {"message": "Notification marked as read"}

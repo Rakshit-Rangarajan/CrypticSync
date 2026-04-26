@@ -1,6 +1,7 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { AttendanceService } from '../attendance.service';
+import { AuthService } from '../auth.service';
 
 interface WeekDay {
   label: string;
@@ -32,41 +33,60 @@ interface HistoryRecord {
 })
 export class ReportsComponent implements OnInit {
   stats = {
-    present: 18,
-    absent: 2,
-    incomplete: 3,
-    totalHours: 168
+    present: 0,
+    absent: 0,
+    incomplete: 0,
+    totalHours: 0
   };
 
-  weekData: WeekDay[] = [
-    { label: 'Mon', percentage: 100, status: 'present' },
-    { label: 'Tue', percentage: 100, status: 'present' },
-    { label: 'Wed', percentage: 80, status: 'incomplete' },
-    { label: 'Thu', percentage: 100, status: 'present' },
-    { label: 'Fri', percentage: 0, status: 'absent' },
-    { label: 'Sat', percentage: 0, status: 'weekend' },
-    { label: 'Sun', percentage: 0, status: 'weekend' }
-  ];
-
+  weekData: WeekDay[] = [];
   monthlyStats: MonthlyStats = {
-    workingDays: 23,
-    present: 18,
-    absent: 2,
-    onLeave: 3
+    workingDays: 0,
+    present: 0,
+    absent: 0,
+    onLeave: 0
   };
 
-  attendanceHistory: HistoryRecord[] = [
-    { date: '2026-04-25', status: 'PRESENT', punchIn: '09:00', punchOut: '18:00', hours: 8 },
-    { date: '2026-04-24', status: 'PRESENT', punchIn: '09:15', punchOut: '17:45', hours: 7.5 },
-    { date: '2026-04-23', status: 'PRESENT', punchIn: '09:00', punchOut: '18:00', hours: 8 },
-    { date: '2026-04-22', status: 'INCOMPLETE', punchIn: '10:30', punchOut: '17:00', hours: 5.5 },
-    { date: '2026-04-21', status: 'ABSENT', reason: 'Unregularized' },
-    { date: '2026-04-18', status: 'LEAVE', reason: 'Sick Leave' }
-  ];
+  attendanceHistory: HistoryRecord[] = [];
+
+  private auth = inject(AuthService);
 
   constructor(private api: AttendanceService) {}
 
-  ngOnInit() {}
+  ngOnInit() {
+    this.loadReports();
+  }
+
+  loadReports() {
+    const user = this.auth.currentUser();
+    if (!user) return;
+
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = today.getMonth() + 1;
+
+    this.api.getCurrentUserLeaves().subscribe(leaves => {
+      this.api.getMonthlyAttendance(user.id, year, month).subscribe(attendance => {
+        this.processData(attendance, leaves);
+      });
+    });
+  }
+
+  private processData(attendance: any[], leaves: any[]) {
+    // Basic processing to replace hardcoded values
+    this.stats.present = attendance.filter(a => a.status === 'PRESENT').length;
+    this.stats.absent = attendance.filter(a => a.status === 'ABSENT').length;
+    this.stats.incomplete = attendance.filter(a => a.status === 'INCOMPLETE').length;
+    this.stats.totalHours = attendance.reduce((sum, a) => sum + (a.totalHours || 0), 0);
+
+    this.attendanceHistory = attendance.map(a => ({
+      date: a.date,
+      status: a.status,
+      punchIn: a.punchIn ? new Date(a.punchIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : undefined,
+      punchOut: a.punchOut ? new Date(a.punchOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : undefined,
+      hours: a.totalHours
+    })).reverse();
+  }
 
   exportPDF() {
     alert('PDF export functionality would be implemented here');

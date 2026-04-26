@@ -1,8 +1,8 @@
-import { Component, inject, OnInit, signal, computed, effect } from '@angular/core';
+import { Component, inject, OnInit, signal, computed } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { AttendanceService, User, AttendanceRecord, LeaveRecord, HolidayRecord } from '../attendance.service';
+import { AttendanceService, User, AttendanceRecord, LeaveRecord, HolidayRecord, AppNotification } from '../attendance.service';
 import { AuthService } from '../auth.service';
 
 interface CalendarDay {
@@ -11,6 +11,7 @@ interface CalendarDay {
   isCurrentMonth: boolean;
   isToday: boolean;
   isWeekend: boolean;
+  isFuture: boolean;
 }
 
 interface LeaveSummary {
@@ -39,6 +40,7 @@ export class DashboardComponent implements OnInit {
   holidays = signal<HolidayRecord[]>([]);
   reportees = signal<User[]>([]);
   reporteesAttendance = signal<{ user: User; attendance: AttendanceRecord[] }[]>([]);
+  notifications = signal<AppNotification[]>([]);
   isLoading = signal(false);
 
   currentMonth = signal(new Date());
@@ -46,19 +48,16 @@ export class DashboardComponent implements OnInit {
   calendarDays = signal<CalendarDay[]>([]);
   currentWeekDates = signal<Date[]>([]);
   today = new Date();
+  wfhSession = signal<AttendanceRecord | null>(null);
+  wfhTimer = signal<string>('00:00:00');
+  private timerInterval: any;
 
-  leaveTypes = signal<string[]>(['Sick Leave', 'Paid Leave', 'Personal Leave', 'Emergency Leave', 'Maternity Leave', 'Paternity Leave']);
   leaveSummary = signal<LeaveSummary[]>([]);
+  showLeaveModal = signal(false);
+  selectedLeaveDate = signal<string>('');
+  showNotifications = false;
 
   weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  leaveTypeColors: Record<string, string> = {
-    'Sick Leave': '#ef4444',
-    'Paid Leave': '#22c55e',
-    'Personal Leave': '#3b82f6',
-    'Emergency Leave': '#f59e0b',
-    'Maternity Leave': '#ec4899',
-    'Paternity Leave': '#8b5cf6',
-  };
 
   isManager = computed(() => this.auth.hasRole('MANAGER') || this.auth.hasRole('ADMIN'));
   currentUser = computed(() => this.auth.currentUser());
@@ -72,6 +71,94 @@ export class DashboardComponent implements OnInit {
     this.generateCurrentWeek();
     this.loadData();
     this.loadLeaveSummary();
+    this.checkTodayWFH();
+    this.loadNotifications();
+  }
+
+  onWFHStart() {
+    this.api.punchIn().subscribe(record => {
+      this.wfhSession.set(record);
+      this.startTimer();
+    });
+  }
+
+  onWFHPause() {
+    this.api.pause().subscribe(record => {
+      this.wfhSession.set(record);
+    });
+  }
+
+  onWFHResume() {
+    this.api.resume().subscribe(record => {
+      this.wfhSession.set(record);
+    });
+  }
+
+  onWFHStop() {
+    if (!confirm('Are you sure you want to stop your session for today?')) return;
+    this.api.punchOut().subscribe(record => {
+      if (this.timerInterval) clearInterval(this.timerInterval);
+      this.wfhSession.set(null);
+      this.wfhTimer.set('00:00:00');
+      this.loadData();
+      alert(`WFH Session ended. Total worked hours: ${record.totalHours?.toFixed(2)}`);
+    });
+  }
+
+  private startTimer() {
+    if (this.timerInterval) clearInterval(this.timerInterval);
+    this.timerInterval = setInterval(() => {
+      const session = this.wfhSession();
+      if (!session || !session.punchIn) return;
+      
+      let totalSeconds = session.totalWorkedSeconds || 0;
+      
+      if (!session.isPaused && session.lastActionTime) {
+        const lastAction = new Date(session.lastActionTime);
+        const now = new Date();
+        const diff = Math.floor((now.getTime() - lastAction.getTime()) / 1000);
+        totalSeconds += diff;
+      }
+      
+      const hours = Math.floor(totalSeconds / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = totalSeconds % 60;
+      
+      this.wfhTimer.set(
+        `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+      );
+    }, 1000);
+  }
+
+
+
+
+
+  loadNotifications() {
+    this.api.getNotifications().subscribe(data => this.notifications.set(data));
+  }
+
+  markAsRead(n: AppNotification) {
+    this.api.markNotificationRead(n.id).subscribe(() => {
+      this.loadNotifications();
+    });
+  }
+
+  unreadCount = computed(() => this.notifications().filter(n => !n.isRead).length);
+
+  ngOnDestroy() {
+    if (this.timerInterval) clearInterval(this.timerInterval);
+  }
+
+  checkTodayWFH() {
+    const todayStr = this.formatDate(new Date());
+    this.api.getAttendance(todayStr).subscribe(data => {
+      const todayRecord = data.find(a => a.userId === this.currentUser()?.id);
+      if (todayRecord && todayRecord.status === 'WFH' && !todayRecord.punchOut) {
+        this.wfhSession.set(todayRecord);
+        this.startTimer();
+      }
+    });
   }
 
   generateCalendarDays() {
@@ -82,6 +169,7 @@ export class DashboardComponent implements OnInit {
     const lastDay = new Date(year, monthIndex + 1, 0);
     const startPadding = (firstDay.getDay() + 6) % 7;
     const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
     const days: CalendarDay[] = [];
 
@@ -106,12 +194,15 @@ export class DashboardComponent implements OnInit {
 
   private createCalendarDay(date: Date, isCurrentMonth: boolean, today: Date): CalendarDay {
     const dayOfWeek = date.getDay();
+    const dateCopy = new Date(date);
+    dateCopy.setHours(0, 0, 0, 0);
     return {
       date,
       day: date.getDate(),
       isCurrentMonth,
       isToday: this.isSameDay(date, today),
-      isWeekend: dayOfWeek === 0 || dayOfWeek === 6
+      isWeekend: dayOfWeek === 0 || dayOfWeek === 6,
+      isFuture: dateCopy > today
     };
   }
 
@@ -155,6 +246,8 @@ export class DashboardComponent implements OnInit {
 
     if (!day.isWeekend && day.isCurrentMonth && day.isToday) return 'NOT_RECORDED';
 
+    if (!day.isWeekend && day.isCurrentMonth && day.isFuture) return 'FUTURE';
+
     return undefined;
   }
 
@@ -170,15 +263,6 @@ export class DashboardComponent implements OnInit {
 
   getStatusCount(status: string): number {
     return this.monthlyAttendance().filter(a => a.status === status).length;
-  }
-
-  getHolidayCount(): number {
-    const year = this.currentMonth().getFullYear();
-    const month = this.currentMonth().getMonth() + 1;
-    return this.holidays().filter(h => {
-      const holidayDate = new Date(h.date);
-      return holidayDate.getMonth() + 1 === month && holidayDate.getFullYear() === year;
-    }).length;
   }
 
   generateCurrentWeek() {
@@ -226,14 +310,10 @@ export class DashboardComponent implements OnInit {
 
     this.api.getCurrentUserLeaves().subscribe({
       next: (data) => this.leaves.set(data),
-      error: () => this.loadMockLeaves()
+      error: (err) => console.error('Error loading leaves:', err)
     });
 
-    this.api.getHolidays(this.currentMonth().getFullYear(), this.currentMonth().getMonth() + 1)
-      .subscribe({
-        next: (data) => this.holidays.set(data),
-        error: () => this.loadMockHolidays()
-      });
+    this.loadAllHolidays();
 
     if (this.isManager()) {
       this.loadReporteesData();
@@ -247,7 +327,14 @@ export class DashboardComponent implements OnInit {
     const month = this.currentMonth();
     this.api.getMonthlyAttendance(userId, month.getFullYear(), month.getMonth() + 1).subscribe({
       next: (data) => this.monthlyAttendance.set(data),
-      error: () => this.loadMockMonthlyAttendance()
+      error: (err) => console.error('Error loading monthly attendance:', err)
+    });
+  }
+
+  loadAllHolidays() {
+    this.api.getHolidays(this.currentMonth().getFullYear()).subscribe({
+      next: (data) => this.holidays.set(data),
+      error: (err) => console.error('Error loading holidays:', err)
     });
   }
 
@@ -259,26 +346,37 @@ export class DashboardComponent implements OnInit {
         if (monday) {
           this.api.getReporteesAttendance(this.formatDate(monday)).subscribe({
             next: (attendanceData) => this.reporteesAttendance.set(attendanceData),
-            error: () => this.loadMockReporteesAttendance()
+            error: (err) => console.error('Error loading reportees attendance:', err)
           });
         }
       },
-      error: () => this.loadMockReportees()
+      error: (err) => console.error('Error loading reportees:', err)
     });
   }
 
   loadLeaveSummary() {
-    const summary: LeaveSummary[] = [
-      { type: 'Sick Leave', used: 2, total: 10, color: '#ef4444' },
-      { type: 'Paid Leave', used: 5, total: 20, color: '#22c55e' },
-      { type: 'Personal Leave', used: 1, total: 5, color: '#3b82f6' },
-      { type: 'Emergency Leave', used: 0, total: 5, color: '#f59e0b' },
-    ];
-    this.leaveSummary.set(summary);
+    this.api.getLeaveBalances().subscribe({
+      next: (balances) => {
+        const summary: LeaveSummary[] = balances.map(b => ({
+          type: b.leaveType.replace('_', ' ').toLowerCase().split(' ').map(s => s.charAt(0).toUpperCase() + s.substring(1)).join(' '),
+          used: b.usedDays,
+          total: b.totalDays,
+          color: this.getLeaveColor(b.leaveType)
+        }));
+        this.leaveSummary.set(summary);
+      },
+      error: (err) => console.error('Error loading leave balances:', err)
+    });
   }
 
-  getLeaveForType(type: string): LeaveRecord[] {
-    return this.leaves().filter(l => l.leaveType === type);
+  private getLeaveColor(type: string): string {
+    switch (type) {
+      case 'SICK_LEAVE': return '#ef4444';
+      case 'PAID_LEAVE': return '#22c55e';
+      case 'CASUAL_LEAVE': return '#3b82f6';
+      case 'EMERGENCY_LEAVE': return '#f59e0b';
+      default: return '#6366f1';
+    }
   }
 
   getReporteeAttendanceForDate(userId: number, date: Date): AttendanceRecord | undefined {
@@ -287,151 +385,86 @@ export class DashboardComponent implements OnInit {
     return reporteeData?.attendance.find(a => a.date === dateStr);
   }
 
-  isUserPresent(userId: number) {
-    return this.attendance().some(a => a.userId === userId && a.status === 'PRESENT');
+  onDateClick(day: CalendarDay) {
+    if (!day.isCurrentMonth || day.isWeekend) return;
+
+    const dateStr = this.formatDate(day.date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const targetDate = new Date(day.date);
+    targetDate.setHours(0, 0, 0, 0);
+
+    if (targetDate > today) {
+      alert('Cannot regularize future dates.');
+      return;
+    }
+
+    const joiningDateStr = this.currentUser()?.joiningDate;
+    if (joiningDateStr) {
+      const joiningDate = new Date(joiningDateStr);
+      joiningDate.setHours(0, 0, 0, 0);
+      if (targetDate < joiningDate) {
+        alert(`Cannot regularize dates before your joining date (${joiningDateStr}).`);
+        return;
+      }
+    }
+
+    if (targetDate > today) {
+      this.selectedLeaveDate.set(dateStr);
+      this.showLeaveModal.set(true);
+      return;
+    }
+
+    this.router.navigate(['/regularization', dateStr]);
   }
 
-  toggleAttendance(user: User) {
-    const present = this.isUserPresent(user.id);
-    const newStatus = present ? 'ABSENT' : 'PRESENT';
-
-    this.api.markAttendance(user.id, {
-      date: this.formatDate(new Date()),
-      status: newStatus,
-      punchIn: newStatus === 'PRESENT' ? new Date().toISOString() : undefined
-    }).subscribe(() => this.loadData());
+  closeLeaveModal() {
+    this.showLeaveModal.set(false);
+    this.selectedLeaveDate.set('');
   }
 
-  addEmployee() {
-    alert("User registration is managed by the Admin.");
+  applyForLeave() {
+    this.router.navigate(['/leave']);
+    this.closeLeaveModal();
+  }
+
+  getDayTooltip(day: CalendarDay): string {
+    if (day.isWeekend) return 'Weekend';
+    
+    const dateStr = this.formatDate(day.date);
+    const holiday = this.holidays().find(h => h.date === dateStr);
+    if (holiday) return holiday.holidayName || 'Holiday';
+
+    const status = this.getDayStatus(day);
+    if (status === 'FUTURE') return 'Click to apply for leave';
+    if (status === 'PRESENT') return 'Present';
+    if (status === 'ABSENT') return 'Absent - Click to regularize';
+    if (status === 'NOT_RECORDED') return 'Click to record attendance';
+    if (status === 'HOLIDAY') return 'Holiday';
+    if (status === 'LEAVE') return 'On Leave';
+    if (status === 'INCOMPLETE') return 'Incomplete - Click to regularize';
+    
+    return 'Click to regularize';
   }
 
   getMonthName(): string {
     return this.currentMonth().toLocaleString('default', { month: 'long', year: 'numeric' });
   }
 
-  isLeapYear(year: number): boolean {
-    return (year % 4 === 0 && year % 100 !== 0) || (year % 400 === 0);
-  }
-
-  getDaysInMonth(): number {
-    const month = this.currentMonth().getMonth();
-    const year = this.currentMonth().getFullYear();
-    const daysInMonths = [31, this.isLeapYear(year) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-    return daysInMonths[month];
-  }
-
   getMonthHolidays(): HolidayRecord[] {
-    const year = this.currentMonth().getFullYear();
-    const month = this.currentMonth().getMonth() + 1;
+    const viewDate = this.currentMonth();
+    const viewYear = viewDate.getFullYear();
+    const viewMonth = viewDate.getMonth(); // 0-indexed
+
     return this.holidays().filter(h => {
-      const d = new Date(h.date);
-      return d.getMonth() + 1 === month && d.getFullYear() === year;
+      // Database date is 'YYYY-MM-DD'
+      const hDate = new Date(h.date);
+      return hDate.getFullYear() === viewYear && hDate.getMonth() === viewMonth;
     });
   }
 
   getPendingLeaves(): LeaveRecord[] {
     return this.leaves().filter(l => l.status === 'PENDING');
-  }
-
-  private loadMockLeaves() {
-    const mockLeaves: LeaveRecord[] = [
-      { id: 1, userId: 1, leaveType: 'Sick Leave', startDate: '2026-04-01', endDate: '2026-04-02', reason: 'Flu', status: 'APPROVED', createdAt: '2026-03-28' },
-      { id: 2, userId: 1, leaveType: 'Paid Leave', startDate: '2026-04-15', endDate: '2026-04-16', reason: 'Personal work', status: 'APPROVED', createdAt: '2026-04-10' },
-      { id: 3, userId: 1, leaveType: 'Personal Leave', startDate: '2026-05-01', endDate: '2026-05-03', reason: 'Family event', status: 'PENDING', createdAt: '2026-04-20' },
-    ];
-    this.leaves.set(mockLeaves);
-  }
-
-  private loadMockHolidays() {
-    const mockHolidays: HolidayRecord[] = [
-      { id: 1, name: 'New Year\'s Day', date: '2026-01-01', description: 'New Year celebration' },
-      { id: 2, name: 'Independence Day', date: '2026-03-14', description: 'National holiday' },
-      { id: 3, name: 'Good Friday', date: '2026-04-03', description: 'Christian holiday' },
-      { id: 4, name: 'May Day', date: '2026-05-01', description: 'International Workers\' Day' },
-    ];
-    this.holidays.set(mockHolidays);
-  }
-
-  private loadMockMonthlyAttendance() {
-    const userId = this.currentUser()?.id || 1;
-    const month = this.currentMonth();
-    const year = month.getFullYear();
-    const monthIndex = month.getMonth();
-    const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
-
-    const mockAttendance: AttendanceRecord[] = [];
-    for (let d = 1; d <= daysInMonth; d++) {
-      const date = new Date(year, monthIndex, d);
-      const dayOfWeek = date.getDay();
-
-      if (dayOfWeek === 0 || dayOfWeek === 6) continue;
-
-      const dateStr = date.toISOString().split('T')[0];
-      const rand = Math.random();
-
-      let status: 'PRESENT' | 'ABSENT' | 'INCOMPLETE';
-      if (rand < 0.85) {
-        status = 'PRESENT';
-      } else if (rand < 0.92) {
-        status = 'ABSENT';
-      } else {
-        status = 'INCOMPLETE';
-      }
-
-      mockAttendance.push({
-        id: d,
-        userId,
-        date: dateStr,
-        punchIn: status === 'PRESENT' ? `${dateStr}T09:00:00` : undefined,
-        punchOut: status === 'PRESENT' ? `${dateStr}T18:00:00` : undefined,
-        totalHours: status === 'PRESENT' ? 8 : status === 'INCOMPLETE' ? 5 : undefined,
-        status
-      });
-    }
-    this.monthlyAttendance.set(mockAttendance);
-  }
-
-  private loadMockReportees() {
-    const mockReportees: User[] = [
-      { id: 2, employeeId: 'EMP-1002', name: 'Alice Johnson', email: 'alice@crypticsync.com', department: 'Engineering', role: 'EMPLOYEE', managerId: 1, isActive: true },
-      { id: 3, employeeId: 'EMP-1003', name: 'Bob Smith', email: 'bob@crypticsync.com', department: 'Engineering', role: 'EMPLOYEE', managerId: 1, isActive: true },
-      { id: 4, employeeId: 'EMP-1004', name: 'Carol Davis', email: 'carol@crypticsync.com', department: 'Marketing', role: 'EMPLOYEE', managerId: 1, isActive: true },
-      { id: 5, employeeId: 'EMP-1005', name: 'David Wilson', email: 'david@crypticsync.com', department: 'Sales', role: 'EMPLOYEE', managerId: 1, isActive: true },
-    ];
-    this.reportees.set(mockReportees);
-    this.loadMockReporteesAttendance();
-  }
-
-  private loadMockReporteesAttendance() {
-    const monday = this.currentWeekDates()[0] || new Date();
-    const mockData: { user: User; attendance: AttendanceRecord[] }[] = this.reportees().map(user => {
-      const attendance: AttendanceRecord[] = this.currentWeekDates().map((date, i) => {
-        const dateStr = this.formatDate(date);
-        const isWeekend = date.getDay() === 0 || date.getDay() === 6;
-
-        let status: 'PRESENT' | 'ABSENT' | 'HOLIDAY' = 'PRESENT';
-        if (isWeekend) {
-          status = 'HOLIDAY';
-        } else if (Math.random() < 0.15) {
-          status = 'ABSENT';
-        }
-
-        return {
-          id: user.id * 10 + i,
-          userId: user.id,
-          date: dateStr,
-          punchIn: status === 'PRESENT' ? `${dateStr}T09:00:00` : undefined,
-          punchOut: status === 'PRESENT' ? `${dateStr}T18:00:00` : undefined,
-          totalHours: status === 'PRESENT' ? 8 : undefined,
-          status
-        };
-      });
-
-      return { user, attendance };
-    });
-
-    this.reporteesAttendance.set(mockData);
   }
 
   getAttendanceIcon(userId: number, date: Date): string {
@@ -456,30 +489,4 @@ export class DashboardComponent implements OnInit {
     }
   }
 
-  onDateClick(day: CalendarDay) {
-    if (!day.isCurrentMonth || day.isWeekend) return;
-
-    const dateStr = this.formatDate(day.date);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const targetDate = new Date(day.date);
-    targetDate.setHours(0, 0, 0, 0);
-
-    if (targetDate > today) {
-      alert('Cannot regularize future dates.');
-      return;
-    }
-
-    this.router.navigate(['/regularization', dateStr]);
-  }
-
-  getDayTooltip(day: CalendarDay): string {
-    if (day.isWeekend) return 'Weekend';
-    const status = this.getDayStatus(day);
-    if (!status) {
-      if (day.isCurrentMonth && !day.isToday) return 'Click to regularize';
-      return 'No record';
-    }
-    return status;
-  }
 }

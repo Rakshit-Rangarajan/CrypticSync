@@ -22,6 +22,7 @@ class UserBase(BaseSchema):
     team_id: Optional[int] = None
     manager_id: Optional[int] = None
     is_active: bool = True
+    joining_date: date = date.today()
 
 class UserCreate(UserBase):
     password: str
@@ -44,6 +45,7 @@ class UserWithTeam(BaseSchema):
     manager_id: Optional[int] = None
     manager_name: Optional[str] = None
     is_active: bool = True
+    joining_date: date = date.today()
 
 class TeamBase(BaseSchema):
     name: str
@@ -69,6 +71,9 @@ class AttendanceBase(BaseSchema):
     punch_in: Optional[datetime] = None
     punch_out: Optional[datetime] = None
     total_hours: Optional[Decimal] = None
+    total_worked_seconds: int = 0
+    is_paused: bool = False
+    last_action_time: Optional[datetime] = None
     status: AttendanceStatus
 
 class AttendanceCreate(AttendanceBase):
@@ -99,6 +104,7 @@ class HolidayBase(BaseSchema):
     date: date
     holiday_name: str
     description: Optional[str] = None
+    is_optional: bool = False
 
 class Holiday(HolidayBase):
     id: int
@@ -121,3 +127,14 @@ class UserStats(BaseSchema):
     total_absent: int = 0
     total_incomplete: int = 0
     pending_leaves: int = 0
+
+class NotificationBase(BaseSchema):
+    title: str
+    message: str
+    type: str
+    is_read: bool = False
+    created_at: Optional[datetime] = None
+
+class Notification(NotificationBase):
+    id: int
+    user_id: int

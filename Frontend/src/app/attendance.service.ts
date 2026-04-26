@@ -9,9 +9,12 @@ export interface User {
   email: string;
   department?: string;
   designation?: string;
-  role: 'EMPLOYEE' | 'MANAGER' | 'ADMIN';
+  role: 'EMPLOYEE' | 'MANAGER' | 'ADMIN' | 'CTO';
   managerId?: number;
+  managerName?: string;
+  teamName?: string;
   isActive: boolean;
+  joiningDate: string;
 }
 
 export interface AttendanceRecord {
@@ -21,7 +24,10 @@ export interface AttendanceRecord {
   punchIn?: string;
   punchOut?: string;
   totalHours?: number;
-  status: 'PRESENT' | 'ABSENT' | 'HOLIDAY' | 'LEAVE' | 'INCOMPLETE' | 'NOT_RECORDED';
+  totalWorkedSeconds: number;
+  isPaused: boolean;
+  lastActionTime?: string;
+  status: 'PRESENT' | 'ABSENT' | 'HOLIDAY' | 'LEAVE' | 'INCOMPLETE' | 'NOT_RECORDED' | 'WFH';
 }
 
 export interface LeaveRecord {
@@ -38,9 +44,28 @@ export interface LeaveRecord {
 
 export interface HolidayRecord {
   id: number;
-  name: string;
+  holidayName: string;
   date: string;
   description?: string;
+  isOptional: boolean;
+}
+
+export interface LeaveBalance {
+  id: number;
+  userId: number;
+  leaveType: string;
+  totalDays: number;
+  usedDays: number;
+}
+
+export interface AppNotification {
+  id: number;
+  userId: number;
+  title: string;
+  message: string;
+  type: 'info' | 'success' | 'warning' | 'error';
+  isRead: boolean;
+  createdAt: string;
 }
 
 @Injectable({
@@ -89,11 +114,10 @@ export class AttendanceService {
     return this.http.get<LeaveRecord[]>(`${this.apiUrl}/leaves/me`, { headers: this.getHeaders() });
   }
 
-  getHolidays(year: number, month: number): Observable<HolidayRecord[]> {
-    return this.http.get<HolidayRecord[]>(
-      `${this.apiUrl}/holidays?year=${year}&month=${month}`,
-      { headers: this.getHeaders() }
-    );
+  getHolidays(year: number, month?: number): Observable<HolidayRecord[]> {
+    let url = `${this.apiUrl}/holidays?year=${year}`;
+    if (month) url += `&month=${month}`;
+    return this.http.get<HolidayRecord[]>(url, { headers: this.getHeaders() });
   }
 
   getReportees(): Observable<User[]> {
@@ -109,5 +133,50 @@ export class AttendanceService {
 
   requestLeave(leave: Partial<LeaveRecord>): Observable<LeaveRecord> {
     return this.http.post<LeaveRecord>(`${this.apiUrl}/leaves`, leave, { headers: this.getHeaders() });
+  }
+
+  punchIn(): Observable<AttendanceRecord> {
+    return this.http.post<AttendanceRecord>(`${this.apiUrl}/attendance/punch-in`, {}, { headers: this.getHeaders() });
+  }
+
+  punchOut(): Observable<AttendanceRecord> {
+    return this.http.post<AttendanceRecord>(`${this.apiUrl}/attendance/punch-out`, {}, { headers: this.getHeaders() });
+  }
+
+  pause(): Observable<AttendanceRecord> {
+    return this.http.post<AttendanceRecord>(`${this.apiUrl}/attendance/pause`, {}, { headers: this.getHeaders() });
+  }
+
+  resume(): Observable<AttendanceRecord> {
+    return this.http.post<AttendanceRecord>(`${this.apiUrl}/attendance/resume`, {}, { headers: this.getHeaders() });
+  }
+
+  getLeaveBalances(): Observable<LeaveBalance[]> {
+    return this.http.get<LeaveBalance[]>(`${this.apiUrl}/leave-balances`, { headers: this.getHeaders() });
+  }
+
+  // Admin Management Methods
+  getTeams(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/teams`, { headers: this.getHeaders() });
+  }
+
+  createTeam(team: any): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/teams`, team, { headers: this.getHeaders() });
+  }
+
+  createHoliday(holiday: any): Observable<HolidayRecord> {
+    return this.http.post<HolidayRecord>(`${this.apiUrl}/holidays`, holiday, { headers: this.getHeaders() });
+  }
+
+  deleteHoliday(holidayId: number): Observable<any> {
+    return this.http.delete<any>(`${this.apiUrl}/holidays/${holidayId}`, { headers: this.getHeaders() });
+  }
+
+  getNotifications(): Observable<AppNotification[]> {
+    return this.http.get<AppNotification[]>(`${this.apiUrl}/notifications`, { headers: this.getHeaders() });
+  }
+
+  markNotificationRead(id: number): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/notifications/${id}/read`, {}, { headers: this.getHeaders() });
   }
 }

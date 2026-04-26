@@ -1,6 +1,6 @@
 from sqlalchemy import Boolean, Column, Integer, String, DateTime, ForeignKey, Date, Enum, Text, Numeric
 from sqlalchemy.orm import relationship
-from datetime import datetime
+from datetime import datetime, date
 import enum
 from database import Base
 
@@ -18,11 +18,13 @@ class AttendanceStatus(enum.Enum):
     LEAVE = "LEAVE"
     INCOMPLETE = "INCOMPLETE"
     NOT_RECORDED = "NOT_RECORDED"
+    WFH = "WFH"
 
 class LeaveType(enum.Enum):
     SICK_LEAVE = "SICK_LEAVE"
     PAID_LEAVE = "PAID_LEAVE"
     PERSONAL_LEAVE = "PERSONAL_LEAVE"
+    CASUAL_LEAVE = "CASUAL_LEAVE"
     EMERGENCY_LEAVE = "EMERGENCY_LEAVE"
     MATERNITY_LEAVE = "MATERNITY_LEAVE"
     PATERNITY_LEAVE = "PATERNITY_LEAVE"
@@ -46,6 +48,7 @@ class User(Base):
     team_id = Column(Integer, ForeignKey("teams.id"), nullable=True)
     manager_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     is_active = Column(Boolean, default=True)
+    joining_date = Column(Date, default=date.today)
 
     manager = relationship("User", remote_side=[id], backref="subordinates")
     attendance_records = relationship("Attendance", back_populates="user")
@@ -71,6 +74,9 @@ class Attendance(Base):
     punch_out = Column(DateTime, nullable=True)
     total_hours = Column(Numeric(5, 2))
     status = Column(Enum(AttendanceStatus))
+    last_action_time = Column(DateTime, nullable=True)
+    total_worked_seconds = Column(Integer, default=0)
+    is_paused = Column(Boolean, default=False)
 
     user = relationship("User", back_populates="attendance_records")
 
@@ -95,6 +101,7 @@ class Holiday(Base):
     date = Column(Date, unique=True)
     holiday_name = Column(String(100))
     description = Column(Text, nullable=True)
+    is_optional = Column(Boolean, default=False)
 
 class LeaveBalance(Base):
     __tablename__ = "leave_balances"
@@ -105,3 +112,17 @@ class LeaveBalance(Base):
     used_days = Column(Integer, default=0)
     
     user = relationship("User")
+
+class Notification(Base):
+    __tablename__ = "notifications"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    title = Column(String)
+    message = Column(String)
+    type = Column(String)  # info, success, warning, error
+    is_read = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.now)
+
+    user = relationship("User", back_populates="notifications")
+
+User.notifications = relationship("Notification", back_populates="user")

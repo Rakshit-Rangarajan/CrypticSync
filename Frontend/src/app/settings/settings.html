@@ -34,6 +34,17 @@
         </svg>
         Preferences
       </button>
+      @if (auth.hasRole('ADMIN')) {
+        <button class="nav-item" [class.active]="activeSection === 'organization'" (click)="activeSection = 'organization'">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+          </svg>
+          Organization
+        </button>
+      }
     </section>
 
     <section class="settings-content">
@@ -42,34 +53,34 @@
           <h2>Profile Information</h2>
           <div class="profile-header">
             <div class="avatar-upload">
-              <div class="avatar-preview">JD</div>
+              <div class="avatar-preview">{{ currentUser()?.name?.substring(0,2) | uppercase }}</div>
               <button class="upload-btn">Change Photo</button>
             </div>
           </div>
           <div class="form-grid">
             <div class="form-group">
               <label>Full Name</label>
-              <input type="text" value="John Doe" class="input-field">
+              <input type="text" [value]="currentUser()?.name" class="input-field">
             </div>
             <div class="form-group">
               <label>Employee ID</label>
-              <input type="text" value="EMP-1001" class="input-field" disabled>
+              <input type="text" [value]="currentUser()?.employeeId" class="input-field" disabled>
             </div>
             <div class="form-group">
               <label>Email</label>
-              <input type="email" value="john@crypticsync.com" class="input-field">
+              <input type="email" [value]="currentUser()?.email" class="input-field">
             </div>
             <div class="form-group">
               <label>Department</label>
-              <input type="text" value="Engineering" class="input-field">
+              <input type="text" [value]="currentUser()?.department" class="input-field">
             </div>
             <div class="form-group">
               <label>Designation</label>
-              <input type="text" value="Software Engineer" class="input-field">
+              <input type="text" [value]="currentUser()?.designation" class="input-field">
             </div>
             <div class="form-group">
-              <label>Phone</label>
-              <input type="tel" placeholder="+91 98765 43210" class="input-field">
+              <label>Team</label>
+              <input type="text" [value]="currentUser()?.teamName || 'N/A'" class="input-field" disabled>
             </div>
           </div>
           <button class="save-btn">Save Changes</button>
@@ -158,6 +169,46 @@
               <option>Asia/Kolkata (IST)</option>
               <option>UTC</option>
             </select>
+          </div>
+        </div>
+      }
+
+      @if (activeSection === 'organization' && auth.hasRole('ADMIN')) {
+        <div class="card">
+          <h2>Manage Teams</h2>
+          <div class="form-row">
+            <input type="text" [(ngModel)]="newTeam.name" placeholder="Team Name" class="input-field">
+            <input type="text" [(ngModel)]="newTeam.department" placeholder="Department" class="input-field">
+            <button class="add-btn" (click)='addTeam()'>Add Team</button>
+          </div>
+          <div class="items-list">
+            @for (team of teams(); track team.id) {
+              <div class="item">
+                <span><strong>{{ team.name }}</strong> ({{ team.department }})</span>
+              </div>
+            }
+          </div>
+
+          <h2 style="margin-top: 2rem;">Manage Holidays</h2>
+          <div class="form-grid">
+            <input type="date" [(ngModel)]="newHoliday.date" class="input-field">
+            <input type="text" [(ngModel)]="newHoliday.holidayName" placeholder="Holiday Name" class="input-field">
+            <input type="text" [(ngModel)]="newHoliday.description" placeholder="Description" class="input-field">
+            <label class="checkbox-label">
+              <input type="checkbox" [(ngModel)]="newHoliday.isOptional"> Optional
+            </label>
+            <button class="add-btn" (click)="addHoliday()">Add Holiday</button>
+          </div>
+          <div class="items-list">
+            @for (holiday of holidays(); track holiday.id) {
+              <div class="item">
+                <div class="item-info">
+                  <span>{{ holiday.date }} - <strong>{{ holiday.holidayName }}</strong></span>
+                  @if (holiday.isOptional) { <span class="badge">Optional</span> }
+                </div>
+                <button class="delete-btn" (click)="deleteHoliday(holiday.id)">Delete</button>
+              </div>
+            }
           </div>
         </div>
       }

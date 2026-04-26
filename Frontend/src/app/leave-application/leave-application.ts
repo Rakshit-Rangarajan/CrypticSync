@@ -24,18 +24,26 @@ export class LeaveApplicationComponent implements OnInit {
   reason = '';
   isSubmitting = false;
 
-  leaveBalances: LeaveBalance[] = [
-    { type: 'Sick Leave', used: 2, total: 10 },
-    { type: 'Paid Leave', used: 5, total: 20 },
-    { type: 'Personal Leave', used: 1, total: 5 },
-    { type: 'Emergency Leave', used: 0, total: 3 },
-  ];
+  leaveBalances: LeaveBalance[] = [];
 
   constructor(private router: Router, private api: AttendanceService) {}
 
   ngOnInit() {
     const today = new Date();
     this.minDate = today.toISOString().split('T')[0];
+    this.loadBalances();
+  }
+
+  loadBalances() {
+    this.api.getLeaveBalances().subscribe({
+      next: (balances) => {
+        this.leaveBalances = balances.map(b => ({
+          type: b.leaveType,
+          used: b.usedDays,
+          total: b.totalDays
+        }));
+      }
+    });
   }
 
   minDate: string = '';

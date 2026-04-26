@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AttendanceService, LeaveRecord } from '../attendance.service';
+import { AuthService } from '../auth.service';
 
 @Component({
   selector: 'app-regularization',
@@ -15,6 +16,7 @@ export class RegularizationComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private api = inject(AttendanceService);
+  private auth = inject(AuthService);
 
   targetDate = signal<string>('');
   selectedStatus = signal<string>('PRESENT');
@@ -68,13 +70,7 @@ export class RegularizationComponent implements OnInit {
   loadRecentRequests() {
     this.api.getCurrentUserLeaves().subscribe({
       next: (data) => this.recentRequests.set(data.slice(0, 5)),
-      error: () => {
-        const mock: LeaveRecord[] = [
-          { id: 1, userId: 1, leaveType: 'SICK_LEAVE', startDate: '2026-04-10', endDate: '2026-04-11', status: 'APPROVED', createdAt: new Date().toISOString() },
-          { id: 2, userId: 1, leaveType: 'PAID_LEAVE', startDate: '2026-04-05', endDate: '2026-04-05', status: 'PENDING', createdAt: new Date().toISOString() },
-        ];
-        this.recentRequests.set(mock);
-      }
+      error: (err) => console.error('Error loading leaves:', err)
     });
   }
 
@@ -105,15 +101,22 @@ export class RegularizationComponent implements OnInit {
       record.leaveType = this.leaveType();
     }
 
-    this.api.markAttendance(1, record).subscribe({
+    const userId = this.auth.currentUser()?.id;
+    if (!userId) {
+      alert('User not authenticated');
+      return;
+    }
+
+    this.api.markAttendance(userId, record).subscribe({
       next: () => {
         this.isSubmitting.set(false);
         alert('Regularization submitted successfully');
         this.router.navigate(['/dashboard']);
       },
-      error: () => {
+      error: (err) => {
         this.isSubmitting.set(false);
-        alert('Failed to submit regularization. Please try again.');
+        const errorMsg = err.error?.detail || 'Failed to submit regularization. Please try again.';
+        alert(errorMsg);
       }
     });
   }

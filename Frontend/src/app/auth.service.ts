@@ -10,8 +10,12 @@ export interface User {
   email: string;
   department?: string;
   designation?: string;
-  role: 'EMPLOYEE' | 'MANAGER' | 'ADMIN';
+  role: 'EMPLOYEE' | 'MANAGER' | 'ADMIN' | 'CTO';
+  managerId?: number;
+  managerName?: string;
+  teamName?: string;
   isActive: boolean;
+  joiningDate: string;
 }
 
 export interface TokenResponse {
