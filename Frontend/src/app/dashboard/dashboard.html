@@ -1,0 +1,88 @@
+<div class="app-container">
+    <!-- Stats Header -->
+    <div class="stats-grid">
+        <div class="stat-card total">
+            <div class="stat-info">
+                <span class="label">Total Employees</span>
+                <h2 class="value">{{ totalEmployees() }}</h2>
+            </div>
+            <div class="stat-icon">👥</div>
+        </div>
+        <div class="stat-card present">
+            <div class="stat-info">
+                <span class="label">Present Today</span>
+                <h2 class="value">{{ presentCount() }}</h2>
+            </div>
+            <div class="stat-icon">✅</div>
+        </div>
+        <div class="stat-card absent">
+            <div class="stat-info">
+                <span class="label">Absent</span>
+                <h2 class="value">{{ absentCount() }}</h2>
+            </div>
+            <div class="stat-icon">❌</div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="glass-panel main-panel">
+        <div class="panel-header">
+            <div>
+                <h2>Attendance Tracking</h2>
+                <p class="subtitle">{{ selectedDate() | date:'fullDate' }}</p>
+            </div>
+            <div class="actions">
+                <input type="date" [(ngModel)]="selectedDate" (change)="loadData()" class="date-picker">
+                <button (click)="addEmployee()" class="btn-primary">+ Add Employee</button>
+            </div>
+        </div>
+
+        <div class="table-container">
+            @if (isLoading()) {
+            <div class="loading-overlay">
+                <div class="spinner"></div>
+                <p>Updating database...</p>
+            </div>
+            }
+
+            <table class="attendance-table">
+                <thead>
+                    <tr>
+                        <th>Employee</th>
+                        <th>Department</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (emp of employees(); track emp.id) {
+                    <tr [class.present-row]="isEmployeePresent(emp.id)">
+                        <td>
+                            <div class="emp-name">
+                                <div class="avatar">{{ emp.name.charAt(0) }}</div>
+                                <span>{{ emp.name }}</span>
+                            </div>
+                        </td>
+                        <td>{{ emp.department }}</td>
+                        <td>
+                            <span class="badge" [class.present]="isEmployeePresent(emp.id)"
+                                [class.absent]="!isEmployeePresent(emp.id)">
+                                {{ isEmployeePresent(emp.id) ? 'Present' : 'Absent' }}
+                            </span>
+                        </td>
+                        <td>
+                            <button (click)="toggleAttendance(emp)" class="btn-toggle">
+                                {{ isEmployeePresent(emp.id) ? 'Mark Absent' : 'Mark Present' }}
+                            </button>
+                        </td>
+                    </tr>
+                    } @empty {
+                    <tr>
+                        <td colspan="4" class="empty-msg">No employees found. Add some to get started!</td>
+                    </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
