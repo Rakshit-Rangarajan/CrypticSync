@@ -1,22 +1,26 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
-export interface Employee {
+export interface User {
   id: number;
+  employeeId: string;
   name: string;
-  department: string;
   email: string;
-  attendance?: AttendanceRecord[];
+  department?: string;
+  designation?: string;
+  role: string;
+  managerId?: number;
 }
 
 export interface AttendanceRecord {
   id: number;
-  employeeId: number;
+  userId: number;
   date: string;
+  punchIn?: string;
+  punchOut?: string;
+  totalHours?: number;
   status: string;
-  checkIn?: string;
-  checkOut?: string;
 }
 
 @Injectable({
@@ -26,20 +30,23 @@ export class AttendanceService {
   private http = inject(HttpClient);
   private apiUrl = 'http://localhost:8000/api';
 
-  getEmployees(): Observable<Employee[]> {
-    return this.http.get<Employee[]>(`${this.apiUrl}/employees`);
+  private getHeaders() {
+    const token = localStorage.getItem('token');
+    return new HttpHeaders({
+      'Authorization': `Bearer ${token}`
+    });
   }
 
-  createEmployee(employee: Partial<Employee>): Observable<Employee> {
-    return this.http.post<Employee>(`${this.apiUrl}/employees`, employee);
+  getUsers(): Observable<User[]> {
+    return this.http.get<User[]>(`${this.apiUrl}/users`, { headers: this.getHeaders() });
   }
 
   getAttendance(date?: string): Observable<AttendanceRecord[]> {
     const url = date ? `${this.apiUrl}/attendance?date=${date}` : `${this.apiUrl}/attendance`;
-    return this.http.get<AttendanceRecord[]>(url);
+    return this.http.get<AttendanceRecord[]>(url, { headers: this.getHeaders() });
   }
 
-  markAttendance(employeeId: number, record: Partial<AttendanceRecord>): Observable<AttendanceRecord> {
-    return this.http.post<AttendanceRecord>(`${this.apiUrl}/attendance?employee_id=${employeeId}`, record);
+  markAttendance(userId: number, record: Partial<AttendanceRecord>): Observable<AttendanceRecord> {
+    return this.http.post<AttendanceRecord>(`${this.apiUrl}/attendance`, { ...record, userId }, { headers: this.getHeaders() });
   }
 }

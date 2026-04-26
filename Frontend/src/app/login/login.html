@@ -1,1 +1,58 @@
-<p>login works!</p>
+<div class="login-container">
+  <div class="glass-card">
+    <div class="logo-section">
+      <div class="logo-icon">CS</div>
+      <h1 class="company-name">CrypticSync</h1>
+      <p class="subtitle">Secure synchronization for your digital assets</p>
+    </div>
+
+    <form (ngSubmit)="onSubmit()" #loginForm="ngForm" class="login-form">
+      <div class="input-group">
+        <label for="username">Email or Employee ID</label>
+        <div class="input-wrapper">
+          <span class="icon">👤</span>
+          <input 
+            type="text" 
+            id="username" 
+            name="username" 
+            [(ngModel)]="username" 
+            placeholder="e.g. admin@crypticsync.com or EMP-1001"
+            required
+            autocomplete="username"
+          >
+        </div>
+      </div>
+
+      <div class="input-group">
+        <label for="password">Password</label>
+        <div class="input-wrapper">
+          <span class="icon">🔒</span>
+          <input 
+            type="password" 
+            id="password" 
+            name="password" 
+            [(ngModel)]="password" 
+            placeholder="Enter your password"
+            required
+            autocomplete="current-password"
+          >
+        </div>
+      </div>
+
+      <div *ngIf="error()" class="error-message">
+        {{ error() }}
+      </div>
+
+      <button type="submit" class="login-button" [disabled]="isLoading()">
+        <span *ngIf="!isLoading()">Login</span>
+        <span *ngIf="isLoading()" class="loader"></span>
+      </button>
+
+      <div class="footer-links">
+        <a href="#">Forgot Password?</a>
+        <span class="divider">|</span>
+        <a href="#">Request Access</a>
+      </div>
+    </form>
+  </div>
+</div>

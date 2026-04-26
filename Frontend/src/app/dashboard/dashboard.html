@@ -3,8 +3,8 @@
     <div class="stats-grid">
         <div class="stat-card total">
             <div class="stat-info">
-                <span class="label">Total Employees</span>
-                <h2 class="value">{{ totalEmployees() }}</h2>
+                <span class="label">Total Users</span>
+                <h2 class="value">{{ totalUsers() }}</h2>
             </div>
             <div class="stat-icon">👥</div>
         </div>
@@ -29,11 +29,11 @@
         <div class="panel-header">
             <div>
                 <h2>Attendance Tracking</h2>
-                <p class="subtitle">{{ selectedDate() | date:'fullDate' }}</p>
+                <p class="subtitle">{{ selectedDate() }}</p>
             </div>
             <div class="actions">
-                <input type="date" [(ngModel)]="selectedDate" (change)="loadData()" class="date-picker">
-                <button (click)="addEmployee()" class="btn-primary">+ Add Employee</button>
+                <input type="date" [ngModel]="selectedDate()" (ngModelChange)="selectedDate.set($event); loadData()" class="date-picker">
+                <button (click)="addEmployee()" class="btn-primary">Manage Users</button>
             </div>
         </div>
 
@@ -48,41 +48,41 @@
             <table class="attendance-table">
                 <thead>
                     <tr>
-                        <th>Employee</th>
+                        <th>User</th>
                         <th>Department</th>
                         <th>Status</th>
                         <th>Action</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @for (emp of employees(); track emp.id) {
-                    <tr [class.present-row]="isEmployeePresent(emp.id)">
+                    @for (user of users(); track user.id) {
+                    <tr [class.present-row]="isUserPresent(user.id)">
                         <td>
                             <div class="emp-name">
-                                <div class="avatar">{{ emp.name.charAt(0) }}</div>
-                                <span>{{ emp.name }}</span>
+                                <div class="avatar">{{ user.name.charAt(0) }}</div>
+                                <span>{{ user.name }}</span>
                             </div>
                         </td>
-                        <td>{{ emp.department }}</td>
+                        <td>{{ user.department || 'N/A' }}</td>
                         <td>
-                            <span class="badge" [class.present]="isEmployeePresent(emp.id)"
-                                [class.absent]="!isEmployeePresent(emp.id)">
-                                {{ isEmployeePresent(emp.id) ? 'Present' : 'Absent' }}
+                            <span class="badge" [class.present]="isUserPresent(user.id)"
+                                [class.absent]="!isUserPresent(user.id)">
+                                {{ isUserPresent(user.id) ? 'Present' : 'Absent' }}
                             </span>
                         </td>
                         <td>
-                            <button (click)="toggleAttendance(emp)" class="btn-toggle">
-                                {{ isEmployeePresent(emp.id) ? 'Mark Absent' : 'Mark Present' }}
+                            <button (click)="toggleAttendance(user)" class="btn-toggle">
+                                {{ isUserPresent(user.id) ? 'Mark Absent' : 'Mark Present' }}
                             </button>
                         </td>
                     </tr>
                     } @empty {
                     <tr>
-                        <td colspan="4" class="empty-msg">No employees found. Add some to get started!</td>
+                        <td colspan="4" class="empty-msg">No users found.</td>
                     </tr>
                     }
                 </tbody>
             </table>
         </div>
     </div>
-</div>
+</div>

@@ -1,14 +1,16 @@
-<nav class="navbar glass-panel">
+<nav class="navbar glass-panel" *ngIf="authService.isAuthenticated()">
   <div class="logo">
-    <span class="logo-icon">🏢</span>
-    <span class="logo-text">AttendanceHub</span>
+    <span class="logo-icon">CS</span>
+    <span class="logo-text">CrypticSync</span>
   </div>
   <div class="nav-links">
     <a routerLink="/dashboard" routerLinkActive="active">Dashboard</a>
-    <a href="#">Employees</a>
-    <a href="#">Reports</a>
+    <a href="#" *ngIf="authService.hasRole('MANAGER')">Employees</a>
+    <a href="#" *ngIf="authService.hasRole('ADMIN')">Reports</a>
   </div>
   <div class="user-profile">
-    <div class="avatar">AD</div>
+    <span class="user-name">{{ authService.currentUser()?.name }}</span>
+    <span class="user-role">{{ authService.currentUser()?.role }}</span>
+    <button class="logout-btn" (click)="logout()">Logout</button>
   </div>
 </nav>

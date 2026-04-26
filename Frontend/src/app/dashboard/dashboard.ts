@@ -1,7 +1,7 @@
 import { Component, inject, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { AttendanceService, Employee, AttendanceRecord } from '../attendance.service';
+import { AttendanceService, User, AttendanceRecord } from '../attendance.service';
 
 @Component({
   selector: 'app-dashboard',
@@ -13,16 +13,16 @@ import { AttendanceService, Employee, AttendanceRecord } from '../attendance.ser
 export class DashboardComponent implements OnInit {
   private api = inject(AttendanceService);
   
-  employees = signal<Employee[]>([]);
+  users = signal<User[]>([]);
   attendance = signal<AttendanceRecord[]>([]);
   isLoading = signal(false);
   
   selectedDate = signal(new Date().toISOString().split('T')[0]);
 
   // Computed Stats
-  totalEmployees = computed(() => this.employees().length);
-  presentCount = computed(() => this.attendance().filter(a => a.status === 'Present').length);
-  absentCount = computed(() => this.totalEmployees() - this.presentCount());
+  totalUsers = computed(() => this.users().length);
+  presentCount = computed(() => this.attendance().filter(a => a.status === 'PRESENT').length);
+  absentCount = computed(() => this.totalUsers() - this.presentCount());
   
   ngOnInit() {
     this.loadData();
@@ -30,32 +30,29 @@ export class DashboardComponent implements OnInit {
 
   async loadData() {
     this.isLoading.set(true);
-    this.api.getEmployees().subscribe(data => this.employees.set(data));
+    this.api.getUsers().subscribe(data => this.users.set(data));
     this.api.getAttendance(this.selectedDate()).subscribe(data => {
       this.attendance.set(data);
       this.isLoading.set(false);
     });
   }
 
-  isEmployeePresent(id: number) {
-    return this.attendance().some(a => a.employeeId === id && a.status === 'Present');
+  isUserPresent(id: number) {
+    return this.attendance().some(a => a.userId === id && a.status === 'PRESENT');
   }
 
-  toggleAttendance(employee: Employee) {
-    const present = this.isEmployeePresent(employee.id);
-    const newStatus = present ? 'Absent' : 'Present';
+  toggleAttendance(user: User) {
+    const present = this.isUserPresent(user.id);
+    const newStatus = present ? 'ABSENT' : 'PRESENT';
     
-    this.api.markAttendance(employee.id, {
+    this.api.markAttendance(user.id, {
       date: this.selectedDate(),
       status: newStatus,
-      checkIn: newStatus === 'Present' ? new Date().toISOString() : undefined
+      punchIn: newStatus === 'PRESENT' ? new Date().toISOString() : undefined
     }).subscribe(() => this.loadData());
   }
 
   addEmployee() {
-    const name = prompt("Enter Employee Name:");
-    if (!name) return;
-    this.api.createEmployee({ name, department: 'General', email: `${name.toLowerCase()}@company.com` })
-      .subscribe(() => this.loadData());
+    alert("User registration is managed by the Admin.");
   }
 }
