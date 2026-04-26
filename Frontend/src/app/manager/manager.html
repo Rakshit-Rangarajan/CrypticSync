@@ -1,0 +1,134 @@
+<div class="manager-container">
+  <header class="manager-header">
+    <div class="header-content">
+      <h1>Manager Control Center</h1>
+      <p>Manage your team's attendance and approvals</p>
+    </div>
+    
+    <div class="manager-tabs">
+      <button [class.active]="activeTab() === 'approvals'" (click)="activeTab.set('approvals')">Pending Approvals</button>
+      <button [class.active]="activeTab() === 'team'" (click)="activeTab.set('team')">Team Directory</button>
+      <button [class.active]="activeTab() === 'reports'" (click)="activeTab.set('reports')">Live Attendance</button>
+    </div>
+  </header>
+
+  <main class="manager-content">
+    
+    <!-- APPROVALS TAB -->
+    @if (activeTab() === 'approvals') {
+      <div class="approvals-grid">
+        <section class="approval-section card">
+          <div class="section-header">
+            <h2>Leave Requests</h2>
+            <span class="count-badge">{{ pendingLeaves().length }} Pending</span>
+          </div>
+          
+          <div class="requests-list">
+            @for (leave of pendingLeaves(); track leave.id) {
+              <div class="request-card">
+                <div class="user-info">
+                  <div class="avatar-sm">JS</div>
+                  <div>
+                    <p class="name">John Smith</p>
+                    <p class="type">{{ leave.leaveType }}</p>
+                  </div>
+                </div>
+                <div class="leave-details">
+                  <p class="dates">{{ leave.startDate }} to {{ leave.endDate }}</p>
+                  <p class="reason">{{ leave.reason || 'No reason provided' }}</p>
+                </div>
+                <div class="actions">
+                  <button class="btn-reject" (click)="rejectLeave(leave.id)">Reject</button>
+                  <button class="btn-approve" (click)="approveLeave(leave.id)">Approve</button>
+                </div>
+              </div>
+            } @empty {
+              <div class="empty-state">
+                <p>All clear! No pending leave requests.</p>
+              </div>
+            }
+          </div>
+        </section>
+
+        <section class="approval-section card">
+          <div class="section-header">
+            <h2>Regularizations</h2>
+            <span class="count-badge">0 Pending</span>
+          </div>
+          <div class="empty-state">
+            <p>No pending regularization requests.</p>
+          </div>
+        </section>
+      </div>
+    }
+
+    <!-- TEAM DIRECTORY TAB -->
+    @if (activeTab() === 'team') {
+      <div class="team-container card">
+        <div class="table-header">
+          <div class="search-box">
+            <input type="text" placeholder="Search reportees..." [ngModel]="searchTerm()" (ngModelChange)="searchTerm.set($event)">
+          </div>
+        </div>
+        
+        <table class="manager-table">
+          <thead>
+            <tr>
+              <th>Employee</th>
+              <th>ID</th>
+              <th>Designation</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (user of filteredReportees(); track user.id) {
+              <tr>
+                <td>
+                  <div class="user-cell">
+                    <div class="avatar-sm">{{ user.name.substring(0,2) | uppercase }}</div>
+                    <span>{{ user.name }}</span>
+                  </div>
+                </td>
+                <td>{{ user.employeeId }}</td>
+                <td>{{ user.designation }}</td>
+                <td>
+                  <span class="status-pill" [class]="getAttendanceStatus(user.id).toLowerCase()">
+                    {{ getAttendanceStatus(user.id) }}
+                  </span>
+                </td>
+                <td>
+                  <button class="btn-text">View Profile</button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+
+    <!-- LIVE ATTENDANCE TAB -->
+    @if (activeTab() === 'reports') {
+      <div class="reports-container">
+        <div class="attendance-matrix card">
+          <h2>Live Team Status</h2>
+          <div class="matrix-grid">
+            @for (user of reportees(); track user.id) {
+              <div class="matrix-card" [class.active]="getAttendanceStatus(user.id) !== 'NOT_RECORDED'">
+                <div class="user-meta">
+                  <strong>{{ user.name }}</strong>
+                  <span>{{ user.department }}</span>
+                </div>
+                <div class="status-indicator">
+                  <div class="pulse-dot" [class]="getAttendanceStatus(user.id).toLowerCase()"></div>
+                  <span>{{ getAttendanceStatus(user.id) }}</span>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+    }
+
+  </main>
+</div>

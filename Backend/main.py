@@ -239,6 +239,27 @@ def get_reportees(db: Session = Depends(get_db), current_user: models.User = Dep
         return result
     return []
 
+@app.get("/api/reportees/attendance")
+def get_reportees_attendance(weekStart: date, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    # 1. Get all reportees
+    reportees = db.query(models.User).filter(models.User.manager_id == current_user.id).all()
+    
+    # 2. Get attendance for the week
+    week_end = weekStart + timedelta(days=6)
+    result = []
+    for user in reportees:
+        attendance = db.query(models.Attendance).filter(
+            models.Attendance.user_id == user.id,
+            models.Attendance.date >= weekStart,
+            models.Attendance.date <= week_end
+        ).all()
+        
+        result.append({
+            "user": user,
+            "attendance": attendance
+        })
+    return result
+
 @app.get("/api/attendance", response_model=List[schemas.Attendance])
 def get_attendance(date: Optional[date] = None, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     query = db.query(models.Attendance)

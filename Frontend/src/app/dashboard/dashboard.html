@@ -7,7 +7,12 @@
     
     <div class="header-center">
       <div class="wfh-status-bar" [class.active]="wfhSession()">
-        @if (!wfhSession()) {
+        @if (isTodayCompleted()) {
+          <div class="status-idle completed">
+            <span>Session Completed</span>
+            <button class="btn-outline-sm" routerLink="/regularization">Regularize</button>
+          </div>
+        } @else if (!wfhSession()) {
           <div class="status-idle">
             <span>Ready to start?</span>
             <button class="btn-primary-sm" (click)="onWFHStart()">Start Session</button>

@@ -6,6 +6,8 @@ import { LeaveApplicationComponent } from './leave-application/leave-application
 import { ReportsComponent } from './reports/reports';
 import { SettingsComponent } from './settings/settings';
 import { ContactHrComponent } from './contact-hr/contact-hr';
+import { ManagerComponent } from './manager/manager';
+import { AdminComponent } from './admin/admin';
 import { authGuard, guestGuard } from './auth.guard';
 
 export const routes: Routes = [
@@ -14,6 +16,8 @@ export const routes: Routes = [
     { path: 'regularization/:date', component: RegularizationComponent, canActivate: [authGuard] },
     { path: 'leave', component: LeaveApplicationComponent, canActivate: [authGuard] },
     { path: 'reports', component: ReportsComponent, canActivate: [authGuard] },
+    { path: 'manager', component: ManagerComponent, canActivate: [authGuard] },
+    { path: 'admin', component: AdminComponent, canActivate: [authGuard] },
     { path: 'settings', component: SettingsComponent, canActivate: [authGuard] },
     { path: 'contact-hr', component: ContactHrComponent, canActivate: [authGuard] },
     { path: '', redirectTo: 'dashboard', pathMatch: 'full' },

@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, signal, computed } from '@angular/core';
+import { Component, inject, OnInit, signal, computed, effect } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -56,6 +56,7 @@ export class DashboardComponent implements OnInit {
   showLeaveModal = signal(false);
   selectedLeaveDate = signal<string>('');
   showNotifications = false;
+  isTodayCompleted = signal(false);
 
   weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -66,12 +67,20 @@ export class DashboardComponent implements OnInit {
   presentCount = computed(() => this.attendance().filter(a => a.status === 'PRESENT').length);
   absentCount = computed(() => this.totalUsers() - this.presentCount());
 
+  constructor() {
+    // Watch for currentUser changes and check session once user is loaded
+    effect(() => {
+      if (this.currentUser()) {
+        this.checkTodayWFH();
+      }
+    });
+  }
+
   ngOnInit() {
     this.generateCalendarDays();
     this.generateCurrentWeek();
     this.loadData();
     this.loadLeaveSummary();
-    this.checkTodayWFH();
     this.loadNotifications();
   }
 
@@ -99,6 +108,7 @@ export class DashboardComponent implements OnInit {
     this.api.punchOut().subscribe(record => {
       if (this.timerInterval) clearInterval(this.timerInterval);
       this.wfhSession.set(null);
+      this.isTodayCompleted.set(true);
       this.wfhTimer.set('00:00:00');
       this.loadData();
       alert(`WFH Session ended. Total worked hours: ${record.totalHours?.toFixed(2)}`);
@@ -154,9 +164,13 @@ export class DashboardComponent implements OnInit {
     const todayStr = this.formatDate(new Date());
     this.api.getAttendance(todayStr).subscribe(data => {
       const todayRecord = data.find(a => a.userId === this.currentUser()?.id);
-      if (todayRecord && todayRecord.status === 'WFH' && !todayRecord.punchOut) {
-        this.wfhSession.set(todayRecord);
-        this.startTimer();
+      if (todayRecord) {
+        if (todayRecord.punchOut) {
+          this.isTodayCompleted.set(true);
+        } else if (todayRecord.punchIn) {
+          this.wfhSession.set(todayRecord);
+          this.startTimer();
+        }
       }
     });
   }
@@ -258,7 +272,10 @@ export class DashboardComponent implements OnInit {
   }
 
   formatDate(date: Date): string {
-    return date.toISOString().split('T')[0];
+    const year = date.getFullYear();
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    return `${year}-${month}-${day}`;
   }
 
   getStatusCount(status: string): number {
