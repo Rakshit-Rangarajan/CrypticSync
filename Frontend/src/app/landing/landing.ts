@@ -16,6 +16,7 @@ export class LandingComponent {
   authService = inject(AuthService);
   private attendanceService = inject(AttendanceService);
   
+  selectedDraft = signal<string | null>(null);
   contactStatus = signal<{ type: 'success' | 'error', message: string } | null>(null);
   
   review = {

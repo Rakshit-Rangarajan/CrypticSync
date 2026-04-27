@@ -74,6 +74,8 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
     user = db.query(models.User).filter(models.User.email == token_data.username).first()
     if user is None:
         raise credentials_exception
+    if not user.is_active:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Your account has been deactivated. Please contact HR.")
     return user
 
 import json
@@ -253,6 +255,12 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email/employee ID or password",
             headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your account has been deactivated. Please contact HR.",
         )
     
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -695,13 +703,34 @@ def create_user(user: schemas.UserCreate, db: Session = Depends(get_db), current
 @app.delete("/api/users/{user_id}")
 def delete_user(user_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     if current_user.role not in [models.UserRole.ADMIN, models.UserRole.SUPER_ADMIN]:
-        raise HTTPException(status_code=403, detail="Only admins can delete users.")
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+    
+    if user.role == models.UserRole.SUPER_ADMIN:
+        raise HTTPException(status_code=400, detail="Cannot delete a Super Admin")
+        
     db.delete(user)
     db.commit()
     return {"message": "User deleted"}
+
+@app.post("/api/users/{user_id}/toggle-status")
+def toggle_user_status(user_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    if current_user.role not in [models.UserRole.ADMIN, models.UserRole.SUPER_ADMIN]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+        
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    if user.role == models.UserRole.SUPER_ADMIN:
+        raise HTTPException(status_code=400, detail="Cannot deactivate a Super Admin")
+        
+    user.is_active = not user.is_active
+    db.commit()
+    return {"message": f"User {'activated' if user.is_active else 'deactivated'}"}
 
 @app.post("/api/teams", response_model=schemas.Team)
 def create_team(team: schemas.TeamCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
