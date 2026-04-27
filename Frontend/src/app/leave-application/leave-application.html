@@ -35,7 +35,17 @@
               <option value="PAID_LEAVE">Paid Leave</option>
               <option value="PERSONAL_LEAVE">Personal Leave</option>
               <option value="EMERGENCY_LEAVE">Emergency Leave</option>
+              <option value="COMPENSATORY_OFF">Compensatory Off</option>
               <option value="WFH">Work From Home</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="leaveDuration">Leave Duration</label>
+            <select id="leaveDuration" [(ngModel)]="leaveDuration" name="leaveDuration" class="select-input" required>
+              <option value="FULL_DAY">Full Day</option>
+              <option value="HALF_DAY_MORNING">Half Day (Morning)</option>
+              <option value="HALF_DAY_EVENING">Half Day (Evening)</option>
             </select>
           </div>
 

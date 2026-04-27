@@ -6,9 +6,17 @@ from database import Base
 
 class UserRole(enum.Enum):
     EMPLOYEE = "EMPLOYEE"
+    TEAM_LEAD = "TEAM_LEAD"
     MANAGER = "MANAGER"
     ADMIN = "ADMIN"
     CTO = "CTO"
+    SUPER_ADMIN = "SUPER_ADMIN"
+
+class RegularizationStatus(enum.Enum):
+    NONE = "NONE"
+    PENDING = "PENDING"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
 
 class AttendanceStatus(enum.Enum):
     PRESENT = "PRESENT"
@@ -28,6 +36,7 @@ class LeaveType(enum.Enum):
     EMERGENCY_LEAVE = "EMERGENCY_LEAVE"
     MATERNITY_LEAVE = "MATERNITY_LEAVE"
     PATERNITY_LEAVE = "PATERNITY_LEAVE"
+    COMPENSATORY_OFF = "COMPENSATORY_OFF"
     WFH = "WFH"
 
 class LeaveStatus(enum.Enum):
@@ -48,7 +57,6 @@ class User(Base):
     team_id = Column(Integer, ForeignKey("teams.id"), nullable=True)
     manager_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     is_active = Column(Boolean, default=True)
-    joining_date = Column(Date, default=date.today)
 
     manager = relationship("User", remote_side=[id], backref="subordinates")
     attendance_records = relationship("Attendance", back_populates="user")
@@ -74,9 +82,12 @@ class Attendance(Base):
     punch_out = Column(DateTime, nullable=True)
     total_hours = Column(Numeric(5, 2))
     status = Column(Enum(AttendanceStatus))
+    reg_status = Column(Enum(RegularizationStatus), default=RegularizationStatus.NONE)
+    reason = Column(Text, nullable=True)
     last_action_time = Column(DateTime, nullable=True)
     total_worked_seconds = Column(Integer, default=0)
     is_paused = Column(Boolean, default=False)
+    overtime_hours = Column(Numeric(5, 2), default=0)
 
     user = relationship("User", back_populates="attendance_records")
 
@@ -87,6 +98,7 @@ class LeaveRequest(Base):
     start_date = Column(Date)
     end_date = Column(Date)
     leave_type = Column(Enum(LeaveType))
+    duration = Column(String(20), default="FULL_DAY") # FULL_DAY, HALF_DAY_MORNING, HALF_DAY_EVENING
     status = Column(Enum(LeaveStatus), default=LeaveStatus.PENDING)
     approver_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     reason = Column(Text, nullable=True)

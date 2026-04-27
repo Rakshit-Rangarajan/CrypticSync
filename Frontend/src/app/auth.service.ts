@@ -10,12 +10,11 @@ export interface User {
   email: string;
   department?: string;
   designation?: string;
-  role: 'EMPLOYEE' | 'MANAGER' | 'ADMIN' | 'CTO';
+  role: 'EMPLOYEE' | 'TEAM_LEAD' | 'MANAGER' | 'ADMIN' | 'CTO' | 'SUPER_ADMIN';
   managerId?: number;
   managerName?: string;
   teamName?: string;
   isActive: boolean;
-  joiningDate: string;
 }
 
 export interface TokenResponse {
@@ -39,10 +38,12 @@ export class AuthService {
   private checkInitialAuth() {
     const token = localStorage.getItem('token');
     if (token) {
+      // Optimistically assume authenticated if token exists to prevent logout on refresh
+      this.isAuthenticated.set(true);
+      
       this.fetchCurrentUser().subscribe({
         next: (user) => {
           this.currentUser.set(user);
-          this.isAuthenticated.set(true);
         },
         error: () => {
           this.logout();
@@ -87,10 +88,10 @@ export class AuthService {
     this.router.navigate(['/login']);
   }
 
-  hasRole(role: 'EMPLOYEE' | 'MANAGER' | 'ADMIN'): boolean {
+  hasRole(role: string): boolean {
     const user = this.currentUser();
     if (!user) return false;
-    if (user.role === 'ADMIN') return true;
+    if (user.role === 'SUPER_ADMIN' || user.role === 'ADMIN') return true;
     return user.role === role;
   }
 }

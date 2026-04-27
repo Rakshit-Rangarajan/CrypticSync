@@ -4,69 +4,40 @@
       <h1 class="greeting">Hi, {{ (currentUser()?.name || 'User').split(' ')[0] }}</h1>
       <p class="date-display">{{ today | date:'EEE, MMM d' }}</p>
     </div>
-    
+
     <div class="header-center">
       <div class="wfh-status-bar" [class.active]="wfhSession()">
         @if (isTodayCompleted()) {
-          <div class="status-idle completed">
-            <span>Session Completed</span>
-            <button class="btn-outline-sm" routerLink="/regularization">Regularize</button>
-          </div>
+        <div class="status-idle completed">
+          <span>Session Completed</span>
+          <button class="btn-outline-sm" routerLink="/regularization">Regularize</button>
+        </div>
         } @else if (!wfhSession()) {
-          <div class="status-idle">
-            <span>Ready to start?</span>
-            <button class="btn-primary-sm" (click)="onWFHStart()">Start Session</button>
-          </div>
+        <div class="status-idle">
+          <span>Ready to start?</span>
+          <button class="btn-primary-sm" (click)="onWFHStart()">Start Session</button>
+        </div>
         } @else {
-          <div class="status-running">
-            <div class="timer-mini">
-              <span class="timer-val">{{ wfhTimer() }}</span>
-              <span class="timer-label">Worked</span>
-            </div>
-            <div class="status-controls">
-              @if (wfhSession()?.isPaused) {
-                <button class="btn-accent-sm" (click)="onWFHResume()">Resume</button>
-              } @else {
-                <button class="btn-warning-sm" (click)="onWFHPause()">Pause</button>
-              }
-              <button class="btn-danger-sm" (click)="onWFHStop()">Stop</button>
-            </div>
+        <div class="status-running">
+          <div class="timer-mini">
+            <span class="timer-val">{{ wfhTimer() }}</span>
+            <span class="timer-label">Worked</span>
           </div>
+          <div class="status-controls">
+            @if (wfhSession()?.isPaused) {
+            <button class="btn-accent-sm" (click)="onWFHResume()">Resume</button>
+            } @else {
+            <button class="btn-warning-sm" (click)="onWFHPause()">Pause</button>
+            }
+            <button class="btn-danger-sm" (click)="onWFHStop()">Stop</button>
+          </div>
+        </div>
         }
       </div>
     </div>
 
     <div class="header-right">
-      <div class="notification-bell" [class.has-unread]="unreadCount() > 0" (click)="showNotifications = !showNotifications">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-          <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-        </svg>
-        @if (unreadCount() > 0) {
-          <span class="badge">{{ unreadCount() }}</span>
-        }
-        
-        @if (showNotifications) {
-          <div class="notifications-dropdown glass-panel">
-            <div class="dropdown-header">
-              <h3>Notifications</h3>
-            </div>
-            <div class="notifications-list">
-              @for (n of notifications(); track n.id) {
-                <div class="notification-item" [class.unread]="!n.isRead" (click)="markAsRead(n); $event.stopPropagation()">
-                  <div class="n-icon" [class]="n.type"></div>
-                  <div class="n-content">
-                    <p class="n-title">{{ n.title }}</p>
-                    <p class="n-message">{{ n.message }}</p>
-                  </div>
-                </div>
-              } @empty {
-                <div class="empty-notifications">No new updates</div>
-              }
-            </div>
-          </div>
-        }
-      </div>
+      <!-- Notifications moved to Navbar -->
     </div>
   </header>
 
@@ -77,27 +48,28 @@
         <div class="widget-header">
           <h2 class="widget-title">Attendance</h2>
           <div class="month-nav">
-            <button (click)="previousMonth()"><svg viewBox="0 0 24 24" stroke="currentColor"><polyline points="15 18 9 12 15 6"></polyline></svg></button>
+            <button (click)="previousMonth()"><svg viewBox="0 0 24 24" stroke="currentColor">
+                <polyline points="15 18 9 12 15 6"></polyline>
+              </svg></button>
             <span>{{ getMonthName() }}</span>
-            <button (click)="nextMonth()"><svg viewBox="0 0 24 24" stroke="currentColor"><polyline points="9 18 15 12 9 6"></polyline></svg></button>
+            <button (click)="nextMonth()"><svg viewBox="0 0 24 24" stroke="currentColor">
+                <polyline points="9 18 15 12 9 6"></polyline>
+              </svg></button>
           </div>
         </div>
 
         <div class="calendar-grid-compact">
           <div class="weekday-header" *ngFor="let day of weekDays">{{ day.substring(0,1) }}</div>
-          <div
-            *ngFor="let day of calendarDays()"
-            class="calendar-day-sm"
-            [class.other-month]="!day.isCurrentMonth"
-            [class.today]="day.isToday"
-            [class.status-present]="getDayStatus(day) === 'PRESENT'"
+          <div *ngFor="let day of calendarDays()" class="calendar-day-sm" [class.other-month]="!day.isCurrentMonth"
+            [class.today]="day.isToday" [class.status-present]="getDayStatus(day) === 'PRESENT'"
             [class.status-absent]="getDayStatus(day) === 'ABSENT'"
+            [class.status-wfh]="getDayStatus(day) === 'WFH'"
+            [class.status-pending]="getDayStatus(day) === 'PENDING'"
+            [class.status-rejected]="getDayStatus(day) === 'REJECTED'"
             [class.status-holiday]="getDayStatus(day) === 'HOLIDAY'"
             [class.status-leave]="getDayStatus(day) === 'LEAVE'"
-            [class.status-incomplete]="getDayStatus(day) === 'INCOMPLETE'"
-            (click)="onDateClick(day)"
-            [title]="getDayTooltip(day)"
-          >
+            [class.status-incomplete]="getDayStatus(day) === 'INCOMPLETE'" (click)="onDateClick(day)"
+            [title]="getDayTooltip(day)">
             {{ day.day }}
           </div>
         </div>
@@ -108,16 +80,15 @@
         <h2 class="widget-title">Team This Week</h2>
         <div class="team-mini-table">
           @for (reporteeData of reporteesAttendance(); track reporteeData.user.id) {
-            <div class="team-row">
-              <span class="team-name">{{ reporteeData.user.name.split(' ')[0] }}</span>
-              <div class="week-dots">
-                @for (date of currentWeekDates(); track date) {
-                  <span class="dot" 
-                        [style.background-color]="getAttendanceColor(reporteeData.user.id, date)"
-                        [title]="date | date:'shortDate'"></span>
-                }
-              </div>
+          <div class="team-row">
+            <span class="team-name">{{ reporteeData.user.name.split(' ')[0] }}</span>
+            <div class="week-dots">
+              @for (date of currentWeekDates(); track date) {
+              <span class="dot" [style.background-color]="getAttendanceColor(reporteeData.user.id, date)"
+                [title]="date | date:'shortDate'"></span>
+              }
             </div>
+          </div>
           }
         </div>
       </section>
@@ -130,12 +101,12 @@
         <h3 class="side-title">Holidays for {{ getMonthName().split(' ')[0] }}</h3>
         <div class="mini-list">
           @for (holiday of getMonthHolidays(); track holiday.id) {
-            <div class="mini-item">
-              <span class="mini-date">{{ holiday.date | date:'dd' }}</span>
-              <span class="mini-name">{{ holiday.holidayName }}</span>
-            </div>
+          <div class="mini-item">
+            <span class="mini-date">{{ holiday.date | date:'dd' }}</span>
+            <span class="mini-name">{{ holiday.holidayName }}</span>
+          </div>
           } @empty {
-            <p class="empty-text">No holidays this month</p>
+          <p class="empty-text">No holidays this month</p>
           }
         </div>
       </section>
@@ -147,15 +118,16 @@
         </div>
         <div class="mini-balances">
           @for (summary of leaveSummary(); track summary.type) {
-            <div class="balance-item">
-              <div class="balance-labels">
-                <span>{{ summary.type.split(' ')[0] }}</span>
-                <span>{{ summary.total - summary.used }} left</span>
-              </div>
-              <div class="balance-bar">
-                <div class="bar-fill" [style.width.%]="((summary.total - summary.used) / summary.total) * 100" [style.background-color]="summary.color"></div>
-              </div>
+          <div class="balance-item">
+            <div class="balance-labels">
+              <span>{{ summary.type.split(' ')[0] }}</span>
+              <span>{{ summary.total - summary.used }} left</span>
             </div>
+            <div class="balance-bar">
+              <div class="bar-fill" [style.width.%]="((summary.total - summary.used) / summary.total) * 100"
+                [style.background-color]="summary.color"></div>
+            </div>
+          </div>
           }
         </div>
       </section>

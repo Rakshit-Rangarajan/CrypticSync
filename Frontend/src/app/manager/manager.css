@@ -82,7 +82,29 @@
   border-radius: 12px;
   padding: 1.25rem;
   margin-bottom: 1rem;
+  transition: all 0.3s;
 }
+
+.request-card.status-approved {
+  border-color: var(--success-color);
+  background: rgba(34, 197, 94, 0.05);
+}
+
+.request-card.status-rejected {
+  border-color: var(--danger-color);
+  background: rgba(239, 68, 68, 0.05);
+}
+
+.status-msg {
+  font-weight: 700;
+  font-size: 0.9rem;
+  width: 100%;
+  text-align: center;
+  padding: 0.6rem;
+}
+
+.status-msg.approved { color: var(--success-color); }
+.status-msg.rejected { color: var(--danger-color); }
 
 .user-info {
   display: flex;
@@ -185,3 +207,104 @@
 
 .pulse-dot.present { background: #22c55e; box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.2); }
 .pulse-dot.wfh { background: var(--accent-color); box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2); }
+
+/* Employee Profile View */
+.profile-container {
+  padding: 2rem;
+}
+
+.profile-header {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.profile-header h2 {
+  font-size: 1.5rem;
+  margin: 0;
+}
+
+.btn-outline-sm {
+  padding: 0.5rem 1rem;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-color);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-outline-sm:hover {
+  background: rgba(255,255,255,0.05);
+}
+
+.month-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2.5rem;
+  background: rgba(255,255,255,0.02);
+  padding: 1.5rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.05);
+}
+
+.month-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.month-label {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.month-value {
+  font-size: 2rem;
+  font-weight: 700;
+  font-family: 'Outfit', sans-serif;
+}
+
+.month-value.success { color: #22c55e; }
+.month-value.danger { color: #ef4444; }
+.month-value.info { color: #3b82f6; }
+.month-value.warning { color: #f59e0b; }
+
+.history-section h3 {
+  margin-bottom: 1.5rem;
+}
+
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.history-table th {
+  text-align: left;
+  padding: 1rem;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.history-table td {
+  padding: 1rem;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.status-badge {
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.badge-present { background: rgba(34, 197, 94, 0.1); color: #4ade80; }
+.badge-absent { background: rgba(239, 68, 68, 0.1); color: #f87171; }
+.badge-leave { background: rgba(168, 85, 247, 0.1); color: #c084fc; }
+.badge-holiday { background: rgba(59, 130, 246, 0.1); color: #60a5fa; }
+.badge-incomplete { background: rgba(249, 115, 22, 0.1); color: #fb923c; }

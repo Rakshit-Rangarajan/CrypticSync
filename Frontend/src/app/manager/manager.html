@@ -9,6 +9,7 @@
       <button [class.active]="activeTab() === 'approvals'" (click)="activeTab.set('approvals')">Pending Approvals</button>
       <button [class.active]="activeTab() === 'team'" (click)="activeTab.set('team')">Team Directory</button>
       <button [class.active]="activeTab() === 'reports'" (click)="activeTab.set('reports')">Live Attendance</button>
+      <button [class.active]="activeTab() === 'broadcast'" (click)="activeTab.set('broadcast')">Announcements</button>
     </div>
   </header>
 
@@ -53,10 +54,36 @@
         <section class="approval-section card">
           <div class="section-header">
             <h2>Regularizations</h2>
-            <span class="count-badge">0 Pending</span>
+            <span class="count-badge">{{ pendingRegularizations().length }} Pending</span>
           </div>
-          <div class="empty-state">
-            <p>No pending regularization requests.</p>
+          <div class="requests-list">
+            @for (reg of pendingRegularizations(); track reg.id) {
+              <div class="request-card" [class.status-approved]="reg.regStatus === 'APPROVED'" [class.status-rejected]="reg.regStatus === 'REJECTED'">
+                <div class="user-info">
+                  <div class="avatar-sm">{{ reg.userName.substring(0,2) | uppercase }}</div>
+                  <div>
+                    <p class="name">{{ reg.userName }}</p>
+                    <p class="type">{{ reg.status }} Request</p>
+                  </div>
+                </div>
+                <div class="leave-details">
+                  <p class="dates">{{ reg.date | date:'longDate' }}</p>
+                  <p class="reason">{{ reg.reason || 'No reason provided' }}</p>
+                </div>
+                <div class="actions">
+                  @if (!reg.regStatus || reg.regStatus === 'PENDING') {
+                    <button class="btn-reject" (click)="rejectRegularization(reg.id)">Reject</button>
+                    <button class="btn-approve" (click)="approveRegularization(reg.id)">Approve</button>
+                  } @else {
+                    <span class="status-msg" [class]="reg.regStatus.toLowerCase()">{{ reg.regStatus }}</span>
+                  }
+                </div>
+              </div>
+            } @empty {
+              <div class="empty-state">
+                <p>No pending regularization requests.</p>
+              </div>
+            }
           </div>
         </section>
       </div>
@@ -98,12 +125,138 @@
                   </span>
                 </td>
                 <td>
-                  <button class="btn-text">View Profile</button>
+                  <button class="btn-text" (click)="viewProfile(user)">View Profile</button>
                 </td>
               </tr>
             }
           </tbody>
         </table>
+      </div>
+    }
+
+    <!-- EMPLOYEE PROFILE TAB -->
+    @if (activeTab() === 'profile' && selectedEmployee()) {
+      <div class="profile-container card">
+        <div class="profile-header">
+          <button class="btn-outline-sm" (click)="closeProfile()">← Back to Team</button>
+          <h2>{{ selectedEmployee()?.name }}'s Attendance Profile</h2>
+          <div class="export-actions" style="margin-left: auto; display: flex; gap: 1rem;">
+            <button class="export-btn" (click)="exportPDF()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="16" y1="13" x2="8" y2="13"></line>
+                <line x1="16" y1="17" x2="8" y2="17"></line>
+                <polyline points="10 9 9 9 8 9"></polyline>
+              </svg>
+              Export PDF
+            </button>
+            <button class="export-btn" (click)="exportExcel()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="8" y1="13" x2="16" y2="17"></line>
+                <line x1="16" y1="13" x2="8" y2="17"></line>
+              </svg>
+              Export Excel
+            </button>
+          </div>
+        </div>
+        
+        <div class="month-stats">
+          <div class="month-item">
+            <span class="month-label">Working Days</span>
+            <span class="month-value">{{ selectedEmployeeStats().workingDays }}</span>
+          </div>
+          <div class="month-item">
+            <span class="month-label">Present</span>
+            <span class="month-value success">{{ selectedEmployeeStats().present }}</span>
+          </div>
+          <div class="month-item">
+            <span class="month-label">Absent</span>
+            <span class="month-value danger">{{ selectedEmployeeStats().absent }}</span>
+          </div>
+          <div class="month-item">
+            <span class="month-label">On Leave</span>
+            <span class="month-value info">{{ selectedEmployeeStats().onLeave }}</span>
+          </div>
+          <div class="month-item">
+            <span class="month-label">Total Hours</span>
+            <span class="month-value warning">{{ selectedEmployeeStats().totalHours }}</span>
+          </div>
+        </div>
+
+        <div class="chart-section" style="margin-bottom: 2.5rem;">
+          <h3>Weekly Summary</h3>
+          <div class="chart-container" style="display: flex; align-items: flex-end; gap: 1rem; height: 150px; padding: 1rem; background: rgba(255,255,255,0.02); border-radius: 12px;">
+            @for (day of weekData(); track day.label) {
+              <div class="bar-wrapper" style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 0.5rem; height: 100%;">
+                <div class="bar" [style.height.%]="day.percentage" [class]="'bg-' + day.status" style="width: 100%; border-radius: 4px 4px 0 0; min-height: 10px; background: var(--primary-color);"></div>
+                <span class="bar-label" style="font-size: 0.8rem; color: var(--text-muted);">{{ day.label }}</span>
+              </div>
+            }
+          </div>
+        </div>
+
+        <div class="leave-balances-section" style="margin-bottom: 2.5rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3>Leave Balances</h3>
+            <button class="btn-outline-sm" (click)="isEditingLeaves.set(!isEditingLeaves())">
+              {{ isEditingLeaves() ? 'Cancel Edit' : 'Edit Balances' }}
+            </button>
+          </div>
+          
+          <div class="balance-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem;">
+            @for (balance of selectedEmployeeLeaves(); track balance.id) {
+              <div class="balance-card" style="background: rgba(255,255,255,0.03); padding: 1rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+                <div class="balance-type" style="font-weight: 500; margin-bottom: 0.5rem; color: var(--text-muted);">{{ balance.leaveType }}</div>
+                <div class="balance-values" style="display: flex; align-items: center; gap: 0.5rem;">
+                  <span style="font-size: 1.5rem; font-weight: 600;">{{ balance.usedDays }}</span>
+                  <span style="color: var(--text-muted);">/</span>
+                  @if (isEditingLeaves()) {
+                    <input type="number" [(ngModel)]="balance.totalDays" class="text-input" style="width: 70px; padding: 0.2rem; margin: 0; display: inline-block; background: rgba(0,0,0,0.2);" min="0">
+                  } @else {
+                    <span style="font-size: 1.5rem; font-weight: 600; color: var(--primary-color);">{{ balance.totalDays }}</span>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+          
+          @if (isEditingLeaves()) {
+            <div style="margin-top: 1rem; display: flex; justify-content: flex-end;">
+              <button class="btn-primary" (click)="saveLeaveBalances()">Save Changes</button>
+            </div>
+          }
+        </div>
+
+        <div class="history-section">
+          <h3>Attendance History</h3>
+          <table class="history-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Status</th>
+                <th>Punch In</th>
+                <th>Punch Out</th>
+                <th>Hours</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (record of selectedEmployeeHistory(); track record.date) {
+                <tr [class]="'row-' + record.status.toLowerCase()">
+                  <td>{{ record.date }}</td>
+                  <td>
+                    <span class="status-badge" [class]="'badge-' + record.status.toLowerCase()">{{ record.status }}</span>
+                  </td>
+                  <td>{{ record.punchIn || '-' }}</td>
+                  <td>{{ record.punchOut || '-' }}</td>
+                  <td>{{ record.hours || '-' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
       </div>
     }
 
@@ -126,6 +279,61 @@
               </div>
             }
           </div>
+        </div>
+      </div>
+    }
+
+    <!-- BROADCAST TAB -->
+    @if (activeTab() === 'broadcast') {
+      <div class="broadcast-section">
+        <div class="section-header" style="margin-bottom: 1.5rem;">
+          <h2>Broadcast Announcement</h2>
+          <p class="subtitle" style="color: var(--text-muted);">Send custom notifications to targeted groups or individuals</p>
+        </div>
+        <div class="card broadcast-form-container" style="max-width: 600px; padding: 2rem;">
+          <form (ngSubmit)="sendBroadcast()" class="broadcast-form" style="display: flex; flex-direction: column; gap: 1.5rem;">
+            <div class="form-group" style="display: flex; flex-direction: column; gap: 0.5rem;">
+              <label style="font-weight: 500;">Target Audience</label>
+              <select [(ngModel)]="broadcastForm.target_type" name="target_type" class="select-input" style="padding: 0.8rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.2); color: white;">
+                <option value="ALL">All Employees</option>
+                <option value="ROLE">Specific Role</option>
+                <option value="TEAM">Specific Team</option>
+                <option value="DEPARTMENT">Specific Department</option>
+                <option value="INDIVIDUAL">Specific Individual (Emp ID)</option>
+              </select>
+            </div>
+
+            @if (broadcastForm.target_type !== 'ALL') {
+              <div class="form-group" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                <label style="font-weight: 500;">Target Value</label>
+                <input type="text" [(ngModel)]="broadcastForm.target_value" name="target_value" class="text-input" placeholder="Enter Role, Team Name, or Emp ID..." required style="padding: 0.8rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.2); color: white;">
+              </div>
+            }
+
+            <div class="form-group" style="display: flex; flex-direction: column; gap: 0.5rem;">
+              <label style="font-weight: 500;">Message Title</label>
+              <input type="text" [(ngModel)]="broadcastForm.title" name="title" class="text-input" required style="padding: 0.8rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.2); color: white;">
+            </div>
+
+            <div class="form-group" style="display: flex; flex-direction: column; gap: 0.5rem;">
+              <label style="font-weight: 500;">Notification Type</label>
+              <select [(ngModel)]="broadcastForm.type" name="type" class="select-input" style="padding: 0.8rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.2); color: white;">
+                <option value="info">Info</option>
+                <option value="warning">Warning</option>
+                <option value="success">Success</option>
+                <option value="error">Urgent</option>
+              </select>
+            </div>
+
+            <div class="form-group" style="display: flex; flex-direction: column; gap: 0.5rem;">
+              <label style="font-weight: 500;">Message Content</label>
+              <textarea [(ngModel)]="broadcastForm.message" name="message" rows="4" class="text-input" required style="padding: 0.8rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.2); color: white; resize: vertical;"></textarea>
+            </div>
+
+            <button type="submit" class="btn-primary" [disabled]="isBroadcasting()" style="padding: 1rem; border-radius: 8px; font-weight: 600; font-size: 1rem; cursor: pointer; border: none; background: var(--primary-color); color: white;">
+              {{ isBroadcasting() ? 'Sending...' : 'Send Broadcast' }}
+            </button>
+          </form>
         </div>
       </div>
     }

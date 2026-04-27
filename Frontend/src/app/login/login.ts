@@ -38,4 +38,17 @@ export class Login {
       }
     });
   }
+
+  fillDemo(role: 'admin' | 'manager' | 'team_lead' | 'employee' | 'superadmin') {
+    const demos = {
+      superadmin: { u: 'superadmin@crypticsync.com', p: 'password123' },
+      admin: { u: 'arun@crypticsync.com', p: 'password123' },
+      manager: { u: 'sarah@crypticsync.com', p: 'password123' },
+      team_lead: { u: 'alice@crypticsync.com', p: 'password123' },
+      employee: { u: 'bob@crypticsync.com', p: 'password123' }
+    };
+    this.username = demos[role].u;
+    this.password = demos[role].p;
+    this.onSubmit();
+  }
 }

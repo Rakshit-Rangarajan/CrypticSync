@@ -40,7 +40,6 @@ export class DashboardComponent implements OnInit {
   holidays = signal<HolidayRecord[]>([]);
   reportees = signal<User[]>([]);
   reporteesAttendance = signal<{ user: User; attendance: AttendanceRecord[] }[]>([]);
-  notifications = signal<AppNotification[]>([]);
   isLoading = signal(false);
 
   currentMonth = signal(new Date());
@@ -55,7 +54,6 @@ export class DashboardComponent implements OnInit {
   leaveSummary = signal<LeaveSummary[]>([]);
   showLeaveModal = signal(false);
   selectedLeaveDate = signal<string>('');
-  showNotifications = false;
   isTodayCompleted = signal(false);
 
   weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -72,6 +70,8 @@ export class DashboardComponent implements OnInit {
     effect(() => {
       if (this.currentUser()) {
         this.checkTodayWFH();
+        this.loadData();
+        this.loadLeaveSummary();
       }
     });
   }
@@ -79,9 +79,9 @@ export class DashboardComponent implements OnInit {
   ngOnInit() {
     this.generateCalendarDays();
     this.generateCurrentWeek();
-    this.loadData();
-    this.loadLeaveSummary();
-    this.loadNotifications();
+    if (this.currentUser()) {
+      this.loadData();
+    }
   }
 
   onWFHStart() {
@@ -144,17 +144,6 @@ export class DashboardComponent implements OnInit {
 
 
 
-  loadNotifications() {
-    this.api.getNotifications().subscribe(data => this.notifications.set(data));
-  }
-
-  markAsRead(n: AppNotification) {
-    this.api.markNotificationRead(n.id).subscribe(() => {
-      this.loadNotifications();
-    });
-  }
-
-  unreadCount = computed(() => this.notifications().filter(n => !n.isRead).length);
 
   ngOnDestroy() {
     if (this.timerInterval) clearInterval(this.timerInterval);
@@ -235,6 +224,9 @@ export class DashboardComponent implements OnInit {
 
     const attendance = this.monthlyAttendance().find(a => a.date === dateStr);
     if (attendance) {
+      if (attendance.regStatus === 'PENDING') return 'PENDING';
+      if (attendance.regStatus === 'REJECTED') return 'REJECTED';
+      
       if (attendance.status === 'LEAVE') {
         const leave = this.leaves().find(l =>
           l.userId === this.currentUser()?.id &&
@@ -416,15 +408,6 @@ export class DashboardComponent implements OnInit {
       return;
     }
 
-    const joiningDateStr = this.currentUser()?.joiningDate;
-    if (joiningDateStr) {
-      const joiningDate = new Date(joiningDateStr);
-      joiningDate.setHours(0, 0, 0, 0);
-      if (targetDate < joiningDate) {
-        alert(`Cannot regularize dates before your joining date (${joiningDateStr}).`);
-        return;
-      }
-    }
 
     if (targetDate > today) {
       this.selectedLeaveDate.set(dateStr);
@@ -455,6 +438,9 @@ export class DashboardComponent implements OnInit {
     const status = this.getDayStatus(day);
     if (status === 'FUTURE') return 'Click to apply for leave';
     if (status === 'PRESENT') return 'Present';
+    if (status === 'WFH') return 'Work From Home';
+    if (status === 'PENDING') return 'Regularization Pending Review';
+    if (status === 'REJECTED') return 'Regularization Rejected';
     if (status === 'ABSENT') return 'Absent - Click to regularize';
     if (status === 'NOT_RECORDED') return 'Click to record attendance';
     if (status === 'HOLIDAY') return 'Holiday';
@@ -498,10 +484,15 @@ export class DashboardComponent implements OnInit {
   getAttendanceColor(userId: number, date: Date): string {
     const record = this.getReporteeAttendanceForDate(userId, date);
     if (!record) return 'var(--text-muted)';
+    if (record.regStatus === 'PENDING') return '#facc15';
+    if (record.regStatus === 'REJECTED') return 'var(--danger-color)';
     switch (record.status) {
       case 'PRESENT': return 'var(--success-color)';
       case 'ABSENT': return 'var(--danger-color)';
-      case 'HOLIDAY': return 'var(--accent-color)';
+      case 'HOLIDAY': return '#60a5fa';
+      case 'LEAVE': return '#c084fc';
+      case 'INCOMPLETE': return '#fb923c';
+      case 'WFH': return '#818cf8';
       default: return 'var(--text-muted)';
     }
   }

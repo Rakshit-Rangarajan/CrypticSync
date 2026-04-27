@@ -3,7 +3,7 @@ from pydantic.alias_generators import to_camel
 from datetime import datetime, date
 from typing import Optional, List
 from decimal import Decimal
-from models import UserRole, AttendanceStatus, LeaveType, LeaveStatus
+from models import UserRole, AttendanceStatus, LeaveType, LeaveStatus, RegularizationStatus
 
 class BaseSchema(BaseModel):
     model_config = ConfigDict(
@@ -22,7 +22,6 @@ class UserBase(BaseSchema):
     team_id: Optional[int] = None
     manager_id: Optional[int] = None
     is_active: bool = True
-    joining_date: date = date.today()
 
 class UserCreate(UserBase):
     password: str
@@ -45,7 +44,6 @@ class UserWithTeam(BaseSchema):
     manager_id: Optional[int] = None
     manager_name: Optional[str] = None
     is_active: bool = True
-    joining_date: date = date.today()
 
 class TeamBase(BaseSchema):
     name: str
@@ -75,9 +73,11 @@ class AttendanceBase(BaseSchema):
     is_paused: bool = False
     last_action_time: Optional[datetime] = None
     status: AttendanceStatus
+    reg_status: RegularizationStatus = RegularizationStatus.NONE
+    reason: Optional[str] = None
 
 class AttendanceCreate(AttendanceBase):
-    user_id: int
+    user_id: Optional[int] = None
 
 class Attendance(AttendanceBase):
     id: int
@@ -90,7 +90,7 @@ class LeaveRequestBase(BaseSchema):
     reason: Optional[str] = None
 
 class LeaveRequestCreate(LeaveRequestBase):
-    user_id: int
+    user_id: Optional[int] = None
 
 class LeaveRequest(LeaveRequestBase):
     id: int
@@ -113,6 +113,10 @@ class LeaveBalanceBase(BaseSchema):
     leave_type: LeaveType
     total_days: int
     used_days: int
+
+class LeaveBalanceUpdate(BaseSchema):
+    leave_type: LeaveType
+    total_days: int
 
 class LeaveBalance(LeaveBalanceBase):
     id: int
@@ -138,3 +142,10 @@ class NotificationBase(BaseSchema):
 class Notification(NotificationBase):
     id: int
     user_id: int
+
+class BroadcastNotification(BaseSchema):
+    title: str
+    message: str
+    type: str
+    target_type: str # ALL, INDIVIDUAL, ROLE, TEAM, DEPARTMENT
+    target_value: Optional[str] = None

@@ -25,7 +25,7 @@
             </svg>
             <input type="text" placeholder="Search by name, ID or email..." [ngModel]="searchTerm()" (ngModelChange)="searchTerm.set($event)">
           </div>
-          <button class="btn-add-user" (click)="showUserModal.set(true)">
+          <button class="btn-add-user" (click)="openAddUser()">
             <span>+ Add Employee</span>
           </button>
         </div>
@@ -37,6 +37,7 @@
                 <th>Employee</th>
                 <th>Role</th>
                 <th>Department</th>
+                <th>Reporting Manager</th>
                 <th>Status</th>
                 <th>Actions</th>
               </tr>
@@ -55,12 +56,13 @@
                   </td>
                   <td><span class="role-badge">{{ user.role }}</span></td>
                   <td>{{ user.department || 'Unassigned' }}</td>
+                  <td>{{ getManagerName(user.managerId) }}</td>
                   <td>
                     <span class="status-dot" [class.active]="user.isActive"></span>
                     {{ user.isActive ? 'Active' : 'Deactivated' }}
                   </td>
                   <td class="action-cells">
-                    <button class="icon-btn" title="Edit" (click)="showUserModal.set(true)">
+                    <button class="icon-btn" title="Edit" (click)="openEditUser(user)">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                     </button>
                     <button class="icon-btn" [title]="user.isActive ? 'Deactivate' : 'Activate'" (click)="toggleUserStatus(user)">
@@ -98,11 +100,11 @@
                   <strong>{{ holiday.holidayName }}</strong>
                   <span>{{ holiday.isOptional ? 'Optional' : 'Mandatory' }}</span>
                 </div>
-                <button class="btn-text danger">Remove</button>
+                <button class="btn-text danger" (click)="deleteHoliday(holiday.id)">Remove</button>
               </div>
             }
           </div>
-          <button class="btn-outline-wide">+ Add Holiday</button>
+          <button class="btn-outline-wide" (click)="showHolidayModal.set(true)">+ Add Holiday</button>
         </section>
         
         <section class="card settings-card">
@@ -119,4 +121,107 @@
     }
 
   </main>
+
+  <!-- ADD USER MODAL -->
+  @if (showUserModal()) {
+    <div class="modal-backdrop">
+      <div class="modal card">
+        <header>
+          <h2>{{ isEditMode() ? 'Edit Employee' : 'Add New Employee' }}</h2>
+          <button class="close-btn" (click)="showUserModal.set(false)">×</button>
+        </header>
+        <form (ngSubmit)="submitUser()" class="admin-form">
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Full Name</label>
+              <input type="text" [(ngModel)]="newUser().name" name="name" required>
+            </div>
+            <div class="form-group">
+              <label>Email Address</label>
+              <input type="email" [(ngModel)]="newUser().email" name="email" required>
+            </div>
+            <div class="form-group">
+              <label>Role</label>
+              <select [(ngModel)]="newUser().role" name="role">
+                <option value="EMPLOYEE">Employee</option>
+                <option value="TEAM_LEAD">Team Lead</option>
+                <option value="MANAGER">Manager</option>
+                <option value="ADMIN">Admin</option>
+                <option value="CTO">CTO</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Reporting Manager</label>
+              <select [(ngModel)]="newUser().managerId" name="managerId">
+                <option [ngValue]="null">None</option>
+                @for (mgr of users(); track mgr.id) {
+                  <option [ngValue]="mgr.id">{{ mgr.name }} ({{ mgr.employeeId }})</option>
+                }
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Department</label>
+              <input type="text" [(ngModel)]="newUser().department" name="department">
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn-ghost" (click)="showUserModal.set(false)">Cancel</button>
+            <button type="submit" class="btn-primary">{{ isEditMode() ? 'Save Changes' : 'Create User' }}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
+
+  <!-- ADD HOLIDAY MODAL -->
+  @if (showHolidayModal()) {
+    <div class="modal-backdrop">
+      <div class="modal card mini-modal">
+        <header>
+          <h2>Add Company Holiday</h2>
+          <button class="close-btn" (click)="showHolidayModal.set(false)">×</button>
+        </header>
+        <form (ngSubmit)="submitHoliday()" class="admin-form">
+          <div class="form-group">
+            <label>Holiday Name</label>
+            <input type="text" [(ngModel)]="newHoliday().holidayName" name="hName" required>
+          </div>
+          <div class="form-group">
+            <label>Date</label>
+            <input type="date" [(ngModel)]="newHoliday().date" name="hDate" required>
+          </div>
+          <div class="form-group-row">
+            <input type="checkbox" [(ngModel)]="newHoliday().isOptional" name="isOpt" id="isOpt">
+            <label for="isOpt">Optional Holiday</label>
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn-ghost" (click)="showHolidayModal.set(false)">Cancel</button>
+            <button type="submit" class="btn-primary">Add Holiday</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
+
+  <!-- ADD DEPARTMENT MODAL -->
+  @if (showDeptModal()) {
+    <div class="modal-backdrop">
+      <div class="modal card mini-modal">
+        <header>
+          <h2>Add New Department</h2>
+          <button class="close-btn" (click)="showDeptModal.set(false)">×</button>
+        </header>
+        <form (ngSubmit)="submitDept()" class="admin-form">
+          <div class="form-group">
+            <label>Department Name</label>
+            <input type="text" [(ngModel)]="newDept().name" name="deptName" required>
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn-ghost" (click)="showDeptModal.set(false)">Cancel</button>
+            <button type="submit" class="btn-primary">Create Department</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
 </div>

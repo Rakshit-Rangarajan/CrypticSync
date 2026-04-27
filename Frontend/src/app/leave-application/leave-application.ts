@@ -21,6 +21,7 @@ export class LeaveApplicationComponent implements OnInit {
   leaveType = '';
   startDate = '';
   endDate = '';
+  leaveDuration: 'FULL_DAY' | 'HALF_DAY_MORNING' | 'HALF_DAY_EVENING' = 'FULL_DAY';
   reason = '';
   isSubmitting = false;
 
@@ -95,6 +96,7 @@ export class LeaveApplicationComponent implements OnInit {
       leaveType: this.leaveType as any,
       startDate: this.startDate,
       endDate: this.endDate,
+      duration: this.leaveDuration,
       reason: this.reason,
       status: 'PENDING' as any
     };

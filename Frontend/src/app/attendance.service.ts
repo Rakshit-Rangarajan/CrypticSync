@@ -9,12 +9,12 @@ export interface User {
   email: string;
   department?: string;
   designation?: string;
-  role: 'EMPLOYEE' | 'MANAGER' | 'ADMIN' | 'CTO';
+  role: 'EMPLOYEE' | 'TEAM_LEAD' | 'MANAGER' | 'ADMIN' | 'CTO' | 'SUPER_ADMIN';
   managerId?: number;
   managerName?: string;
   teamName?: string;
   isActive: boolean;
-  joiningDate: string;
+  password?: string;
 }
 
 export interface AttendanceRecord {
@@ -28,6 +28,8 @@ export interface AttendanceRecord {
   isPaused: boolean;
   lastActionTime?: string;
   status: 'PRESENT' | 'ABSENT' | 'HOLIDAY' | 'LEAVE' | 'INCOMPLETE' | 'NOT_RECORDED' | 'WFH';
+  regStatus: 'NONE' | 'PENDING' | 'APPROVED' | 'REJECTED';
+  reason?: string;
 }
 
 export interface LeaveRecord {
@@ -36,6 +38,7 @@ export interface LeaveRecord {
   leaveType: string;
   startDate: string;
   endDate: string;
+  duration?: 'FULL_DAY' | 'HALF_DAY_MORNING' | 'HALF_DAY_EVENING';
   reason?: string;
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
   approvedBy?: number;
@@ -135,8 +138,65 @@ export class AttendanceService {
     return this.http.post<LeaveRecord>(`${this.apiUrl}/leaves`, leave, { headers: this.getHeaders() });
   }
 
+  getUserLeaveBalances(userId: number): Observable<LeaveBalance[]> {
+    return this.http.get<LeaveBalance[]>(`${this.apiUrl}/leave-balances/${userId}`, { headers: this.getHeaders() });
+  }
+
+  updateLeaveBalances(userId: number, updates: { leave_type: string; total_days: number }[]): Observable<LeaveBalance[]> {
+    return this.http.put<LeaveBalance[]>(`${this.apiUrl}/leave-balances/${userId}`, updates, { headers: this.getHeaders() });
+  }
+
+  broadcastNotification(data: { title: string; message: string; type: string; target_type: string; target_value?: string }): Observable<any> {
+    return this.http.post(`${this.apiUrl}/notifications/broadcast`, data, { headers: this.getHeaders() });
+  }
+
   punchIn(): Observable<AttendanceRecord> {
     return this.http.post<AttendanceRecord>(`${this.apiUrl}/attendance/punch-in`, {}, { headers: this.getHeaders() });
+  }
+
+  // Admin Methods
+  createUser(user: Partial<User>): Observable<User> {
+    return this.http.post<User>(`${this.apiUrl}/users`, user, { headers: this.getHeaders() });
+  }
+
+  updateUser(userId: number, user: Partial<User>): Observable<User> {
+    return this.http.put<User>(`${this.apiUrl}/users/${userId}`, user, { headers: this.getHeaders() });
+  }
+
+  deleteUser(userId: number): Observable<any> {
+    return this.http.delete(`${this.apiUrl}/users/${userId}`, { headers: this.getHeaders() });
+  }
+
+  getTeams(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/teams`, { headers: this.getHeaders() });
+  }
+
+  createTeam(team: any): Observable<any> {
+    return this.http.post(`${this.apiUrl}/teams`, team, { headers: this.getHeaders() });
+  }
+
+  deleteTeam(teamId: number): Observable<any> {
+    return this.http.delete(`${this.apiUrl}/teams/${teamId}`, { headers: this.getHeaders() });
+  }
+
+  createHoliday(holiday: Partial<HolidayRecord>): Observable<HolidayRecord> {
+    return this.http.post<HolidayRecord>(`${this.apiUrl}/holidays`, holiday, { headers: this.getHeaders() });
+  }
+
+  deleteHoliday(holidayId: number): Observable<any> {
+    return this.http.delete(`${this.apiUrl}/holidays/${holidayId}`, { headers: this.getHeaders() });
+  }
+
+  approveRegularization(attendanceId: number): Observable<any> {
+    return this.http.post(`${this.apiUrl}/attendance/${attendanceId}/approve`, {}, { headers: this.getHeaders() });
+  }
+
+  rejectRegularization(attendanceId: number): Observable<any> {
+    return this.http.post(`${this.apiUrl}/attendance/${attendanceId}/reject`, {}, { headers: this.getHeaders() });
+  }
+
+  getManagerPending(): Observable<{ leaves: any[], regularizations: any[] }> {
+    return this.http.get<{ leaves: any[], regularizations: any[] }>(`${this.apiUrl}/manager/pending`, { headers: this.getHeaders() });
   }
 
   punchOut(): Observable<AttendanceRecord> {
@@ -153,23 +213,6 @@ export class AttendanceService {
 
   getLeaveBalances(): Observable<LeaveBalance[]> {
     return this.http.get<LeaveBalance[]>(`${this.apiUrl}/leave-balances`, { headers: this.getHeaders() });
-  }
-
-  // Admin Management Methods
-  getTeams(): Observable<any[]> {
-    return this.http.get<any[]>(`${this.apiUrl}/teams`, { headers: this.getHeaders() });
-  }
-
-  createTeam(team: any): Observable<any> {
-    return this.http.post<any>(`${this.apiUrl}/teams`, team, { headers: this.getHeaders() });
-  }
-
-  createHoliday(holiday: any): Observable<HolidayRecord> {
-    return this.http.post<HolidayRecord>(`${this.apiUrl}/holidays`, holiday, { headers: this.getHeaders() });
-  }
-
-  deleteHoliday(holidayId: number): Observable<any> {
-    return this.http.delete<any>(`${this.apiUrl}/holidays/${holidayId}`, { headers: this.getHeaders() });
   }
 
   getNotifications(): Observable<AppNotification[]> {

@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, date, time
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
-import models, schemas
+import models, schemas, random
 from database import SessionLocal, engine
 
 load_dotenv()
@@ -110,7 +110,6 @@ def init_db(db: Session):
             department=u["department"],
             designation=u["designation"],
             role=models.UserRole(u["role"]),
-            joining_date=date.fromisoformat(u["joining_date"]),
             is_active=True
         )
         if u.get("team_name"):
@@ -121,10 +120,11 @@ def init_db(db: Session):
         users_by_emp_id[u["employee_id"]] = user
 
         # Seed initial Leave Balances
-        for lt in models.LeaveType:
-            if lt != models.LeaveType.WFH:
-                balance = models.LeaveBalance(user_id=user.id, leave_type=lt, total_days=12, used_days=0)
-                db.add(balance)
+        if user.role != models.UserRole.SUPER_ADMIN:
+            for lt in models.LeaveType:
+                if lt != models.LeaveType.WFH and lt != models.LeaveType.COMPENSATORY_OFF:
+                    balance = models.LeaveBalance(user_id=user.id, leave_type=lt, total_days=12, used_days=0)
+                    db.add(balance)
 
     # 3. Set Manager Relationships
     for u in data.get("users", []):
@@ -153,7 +153,35 @@ def init_db(db: Session):
             is_read=False
         )
         db.add(notif)
-    
+        
+        # 6. Seed 30 days of historical attendance for realism
+        if user.role != models.UserRole.SUPER_ADMIN:
+            for i in range(1, 31):
+                hist_date = date.today() - timedelta(days=i)
+                # Skip weekends
+                if hist_date.weekday() >= 5: continue
+            
+            # Randomly assign status (80% Present, 10% WFH, 10% Absent)
+            rand = random.random()
+            if rand < 0.7:
+                status = "PRESENT"
+            elif rand < 0.9:
+                status = "WFH"
+            else:
+                status = "ABSENT"
+                
+            if status != "ABSENT":
+                db.add(models.Attendance(
+                    user_id=user.id,
+                    date=hist_date,
+                    status=status,
+                    punch_in=datetime.combine(hist_date, time(9, 0)),
+                    punch_out=datetime.combine(hist_date, time(18, 0)),
+                    total_worked_seconds=32400 # 9 hours
+                ))
+            else:
+                db.add(models.Attendance(user_id=user.id, date=hist_date, status="ABSENT"))
+
     db.commit()
     print("Database initialized successfully from initial_data.json")
 
@@ -214,29 +242,36 @@ async def read_users_me(current_user: models.User = Depends(get_current_user), d
 
 @app.get("/api/users", response_model=List[schemas.UserWithTeam])
 def get_users(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    if current_user.role in [models.UserRole.CTO, models.UserRole.ADMIN]:
+    if current_user.role in [models.UserRole.CTO, models.UserRole.ADMIN, models.UserRole.SUPER_ADMIN]:
         return db.query(models.User).all()
     elif current_user.role == models.UserRole.MANAGER:
         direct = db.query(models.User).filter(models.User.manager_id == current_user.id).all()
         all_users = [current_user] + direct
         for r in direct:
-            if r.role == models.UserRole.MANAGER:
+            if r.role == models.UserRole.TEAM_LEAD:
                 sub = db.query(models.User).filter(models.User.manager_id == r.id).all()
                 all_users.extend(sub)
         return all_users
+    elif current_user.role == models.UserRole.TEAM_LEAD:
+        direct = db.query(models.User).filter(models.User.manager_id == current_user.id).all()
+        return [current_user] + direct
     return [current_user]
 
 @app.get("/api/reportees", response_model=List[schemas.UserWithTeam])
 def get_reportees(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    if current_user.role in [models.UserRole.CTO, models.UserRole.ADMIN]:
+    if current_user.role in [models.UserRole.ADMIN, models.UserRole.SUPER_ADMIN]:
+        return db.query(models.User).all()
+    elif current_user.role == models.UserRole.CTO:
         return db.query(models.User).filter(models.User.manager_id == current_user.id).all()
     elif current_user.role == models.UserRole.MANAGER:
         direct = db.query(models.User).filter(models.User.manager_id == current_user.id).all()
         result = list(direct)
         for user in direct:
-            if user.role == models.UserRole.MANAGER:
+            if user.role == models.UserRole.TEAM_LEAD:
                 result.extend(db.query(models.User).filter(models.User.manager_id == user.id).all())
         return result
+    elif current_user.role == models.UserRole.TEAM_LEAD:
+        return db.query(models.User).filter(models.User.manager_id == current_user.id).all()
     return []
 
 @app.get("/api/reportees/attendance")
@@ -269,6 +304,24 @@ def get_attendance(date: Optional[date] = None, db: Session = Depends(get_db), c
         query = query.filter(models.Attendance.date == date)
     return query.all()
 
+@app.get("/api/attendance/{user_id}/monthly", response_model=List[schemas.Attendance])
+def get_monthly_attendance(user_id: int, year: int, month: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    from datetime import date
+    start_date = date(year, month, 1)
+    if month == 12:
+        end_date = date(year + 1, 1, 1)
+    else:
+        end_date = date(year, month + 1, 1)
+        
+    if current_user.role == models.UserRole.EMPLOYEE and current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+        
+    return db.query(models.Attendance).filter(
+        models.Attendance.user_id == user_id,
+        models.Attendance.date >= start_date,
+        models.Attendance.date < end_date
+    ).all()
+
 @app.post("/api/attendance", response_model=schemas.Attendance)
 def mark_attendance(attendance_data: schemas.AttendanceCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     # Regularization logic
@@ -276,12 +329,16 @@ def mark_attendance(attendance_data: schemas.AttendanceCreate, db: Session = Dep
     if attendance_data.date > today:
         raise HTTPException(status_code=400, detail="Cannot regularize future dates.")
     
-    user = db.query(models.User).filter(models.User.id == attendance_data.user_id).first()
-    if user and user.joining_date and attendance_data.date < user.joining_date:
-        raise HTTPException(status_code=400, detail=f"Cannot regularize dates before joining date ({user.joining_date}).")
+    user_id = attendance_data.user_id or current_user.id
+    target_user = db.query(models.User).filter(models.User.id == user_id).first()
+    
+    # Determine initial status
+    reg_status = models.RegularizationStatus.APPROVED
+    if current_user.role not in [models.UserRole.ADMIN, models.UserRole.CTO]:
+        reg_status = models.RegularizationStatus.PENDING
 
     existing = db.query(models.Attendance).filter(
-        models.Attendance.user_id == attendance_data.user_id,
+        models.Attendance.user_id == user_id,
         models.Attendance.date == attendance_data.date
     ).first()
     
@@ -290,22 +347,48 @@ def mark_attendance(attendance_data: schemas.AttendanceCreate, db: Session = Dep
         existing.punch_in = attendance_data.punch_in
         existing.punch_out = attendance_data.punch_out
         existing.total_hours = attendance_data.total_hours
-        db.commit()
-        db.refresh(existing)
-        return existing
+        existing.reg_status = reg_status
+        existing.reason = attendance_data.reason
+    else:
+        existing = models.Attendance(
+            user_id=user_id,
+            date=attendance_data.date,
+            status=attendance_data.status,
+            punch_in=attendance_data.punch_in,
+            punch_out=attendance_data.punch_out,
+            total_hours=attendance_data.total_hours,
+            reg_status=reg_status,
+            reason=attendance_data.reason
+        )
+        db.add(existing)
     
-    new_record = models.Attendance(
-        user_id=attendance_data.user_id,
-        date=attendance_data.date,
-        status=attendance_data.status,
-        punch_in=attendance_data.punch_in,
-        punch_out=attendance_data.punch_out,
-        total_hours=attendance_data.total_hours
-    )
-    db.add(new_record)
     db.commit()
-    db.refresh(new_record)
-    return new_record
+    db.refresh(existing)
+
+    # NOTIFICATION LOGIC
+    if reg_status == models.RegularizationStatus.PENDING:
+        # Notify only reporting manager
+        if target_user and target_user.manager_id:
+            notif = models.Notification(
+                user_id=target_user.manager_id,
+                title="Regularization Pending",
+                message=f"{target_user.name} submitted a regularization request for {attendance_data.date}",
+                type="ATTENDANCE"
+            )
+            db.add(notif)
+    else:
+        # If approved manually by someone else, notify the user
+        if current_user.id != user_id:
+            notif = models.Notification(
+                user_id=user_id,
+                title="Attendance Updated",
+                message=f"Your attendance for {attendance_data.date} was updated by {current_user.name}",
+                type="ATTENDANCE"
+            )
+            db.add(notif)
+            
+    db.commit()
+    return existing
 
 @app.post("/api/attendance/punch-in", response_model=schemas.Attendance)
 def punch_in(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
@@ -404,12 +487,36 @@ def punch_out(db: Session = Depends(get_db), current_user: models.User = Depends
     record.punch_out = now
     record.total_hours = record.total_worked_seconds / 3600
     
-    if record.total_hours < 4:
-        record.status = models.AttendanceStatus.ABSENT
-    elif record.total_hours < 8:
-        record.status = models.AttendanceStatus.PARTIAL
-    else:
+    is_holiday = db.query(models.Holiday).filter(models.Holiday.date == today).first() is not None
+    
+    def credit_overtime(hours: float):
+        record.overtime_hours = hours
+        leave_balance = db.query(models.LeaveBalance).filter(
+            models.LeaveBalance.user_id == current_user.id,
+            models.LeaveBalance.leave_type == models.LeaveType.COMPENSATORY_OFF
+        ).first()
+        if leave_balance:
+            leave_balance.total_days += float(hours / 9)
+        else:
+            db.add(models.LeaveBalance(
+                user_id=current_user.id,
+                leave_type=models.LeaveType.COMPENSATORY_OFF,
+                total_days=float(hours / 9),
+                used_days=0
+            ))
+            
+    if is_holiday:
         record.status = models.AttendanceStatus.PRESENT
+        credit_overtime(float(record.total_hours))
+    else:
+        if record.total_hours < 4:
+            record.status = models.AttendanceStatus.ABSENT
+        elif record.total_hours < 9:
+            record.status = models.AttendanceStatus.PARTIAL
+        else:
+            record.status = models.AttendanceStatus.PRESENT
+            if record.total_hours > 9:
+                credit_overtime(float(record.total_hours - 9))
     
     db.commit()
     db.refresh(record)
@@ -469,9 +576,34 @@ def get_holidays(year: Optional[int] = None, month: Optional[int] = None, db: Se
 # User Management (Admin Only)
 @app.get("/api/users", response_model=List[schemas.User])
 def get_users(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    if current_user.role not in [models.UserRole.ADMIN, models.UserRole.CTO]:
-        raise HTTPException(status_code=403, detail="Not authorized")
     return db.query(models.User).all()
+
+@app.get("/api/org/hierarchy")
+def get_org_hierarchy(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    # Get all users
+    users = db.query(models.User).all()
+    
+    # Build a map of users by ID for quick lookup
+    user_map = {u.id: {
+        "id": u.id,
+        "name": u.name,
+        "role": u.role,
+        "designation": u.designation,
+        "department": u.department,
+        "avatar": f"https://ui-avatars.com/api/?name={u.name.replace(' ', '+')}&background=random",
+        "children": []
+    } for u in users}
+    
+    roots = []
+    for u in users:
+        node = user_map[u.id]
+        if u.manager_id and u.manager_id in user_map:
+            user_map[u.manager_id]["children"].append(node)
+        else:
+            # No manager or manager not in list (root level)
+            roots.append(node)
+            
+    return roots
 
 @app.post("/api/users", response_model=schemas.User)
 def create_user(user: schemas.UserCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
@@ -492,8 +624,7 @@ def create_user(user: schemas.UserCreate, db: Session = Depends(get_db), current
         designation=user.designation,
         role=user.role,
         team_id=user.team_id,
-        manager_id=user.manager_id,
-        joining_date=user.joining_date
+        manager_id=user.manager_id
     )
     db.add(db_user)
     db.commit()
@@ -556,15 +687,127 @@ def delete_holiday(holiday_id: int, db: Session = Depends(get_db), current_user:
     db.commit()
     return {"message": "Holiday deleted"}
 
+# Admin Management (Users)
+@app.delete("/api/users/{user_id}")
+def delete_user(user_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    if current_user.role != models.UserRole.ADMIN:
+        raise HTTPException(status_code=403, detail="Only admins can delete users.")
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    db.delete(user)
+    db.commit()
+    return {"message": "User deleted successfully"}
+
+@app.put("/api/users/{user_id}", response_model=schemas.User)
+def update_user(user_id: int, user_data: schemas.UserBase, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    if current_user.role != models.UserRole.ADMIN:
+        raise HTTPException(status_code=403, detail="Only admins can update users.")
+    db_user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    for key, value in user_data.model_dump(exclude_unset=True).items():
+        setattr(db_user, key, value)
+    
+    db.commit()
+    db.refresh(db_user)
+    return db_user
+
+@app.delete("/api/teams/{team_id}")
+def delete_team(team_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    if current_user.role != models.UserRole.ADMIN:
+        raise HTTPException(status_code=403, detail="Only admins can delete teams.")
+    team = db.query(models.Team).filter(models.Team.id == team_id).first()
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+    db.delete(team)
+    db.commit()
+    return {"message": "Team deleted successfully"}
+
 # Leave Balances
 @app.get("/api/leave-balances", response_model=List[schemas.LeaveBalance])
 def get_leave_balances(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     return db.query(models.LeaveBalance).filter(models.LeaveBalance.user_id == current_user.id).all()
 
+@app.get("/api/leave-balances/{user_id}", response_model=List[schemas.LeaveBalance])
+def get_user_leave_balances(user_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    target_user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    if current_user.role not in [models.UserRole.ADMIN, models.UserRole.SUPER_ADMIN] and current_user.id != target_user.manager_id and current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+        
+    return db.query(models.LeaveBalance).filter(models.LeaveBalance.user_id == user_id).all()
+
+@app.put("/api/leave-balances/{user_id}", response_model=List[schemas.LeaveBalance])
+def update_leave_balances(user_id: int, updates: List[schemas.LeaveBalanceUpdate], db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    target_user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    if current_user.role not in [models.UserRole.ADMIN, models.UserRole.SUPER_ADMIN] and current_user.id != target_user.manager_id:
+        raise HTTPException(status_code=403, detail="Not authorized to edit leave balances")
+        
+    for update in updates:
+        balance = db.query(models.LeaveBalance).filter(
+            models.LeaveBalance.user_id == user_id,
+            models.LeaveBalance.leave_type == update.leave_type
+        ).first()
+        if balance:
+            balance.total_days = update.total_days
+        else:
+            db.add(models.LeaveBalance(
+                user_id=user_id,
+                leave_type=update.leave_type,
+                total_days=update.total_days,
+                used_days=0
+            ))
+            
+    db.commit()
+    return db.query(models.LeaveBalance).filter(models.LeaveBalance.user_id == user_id).all()
+
 # Notifications
 @app.get("/api/notifications", response_model=List[schemas.Notification])
 def get_notifications(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     return db.query(models.Notification).filter(models.Notification.user_id == current_user.id).order_by(models.Notification.created_at.desc()).all()
+
+@app.post("/api/notifications/broadcast")
+def broadcast_notification(data: schemas.BroadcastNotification, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    if current_user.role not in [models.UserRole.ADMIN, models.UserRole.SUPER_ADMIN, models.UserRole.MANAGER]:
+        raise HTTPException(status_code=403, detail="Not authorized to broadcast notifications")
+        
+    target_users = []
+    
+    if data.target_type == "ALL":
+        target_users = db.query(models.User).all()
+    elif data.target_type == "INDIVIDUAL":
+        target_users = db.query(models.User).filter(models.User.employee_id == data.target_value).all()
+    elif data.target_type == "ROLE":
+        try:
+            role_enum = models.UserRole(data.target_value)
+            target_users = db.query(models.User).filter(models.User.role == role_enum).all()
+        except ValueError:
+            pass # Invalid role
+    elif data.target_type == "TEAM":
+        team = db.query(models.Team).filter(models.Team.name == data.target_value).first()
+        if team:
+            target_users = db.query(models.User).filter(models.User.team_id == team.id).all()
+    elif data.target_type == "DEPARTMENT":
+        target_users = db.query(models.User).filter(models.User.department == data.target_value).all()
+        
+    for user in target_users:
+        notif = models.Notification(
+            user_id=user.id,
+            title=data.title,
+            message=data.message,
+            type=data.type
+        )
+        db.add(notif)
+        
+    db.commit()
+    return {"message": f"Broadcasted to {len(target_users)} users"}
 
 @app.post("/api/notifications/{notification_id}/read")
 def mark_notification_read(notification_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
@@ -577,3 +820,134 @@ def mark_notification_read(notification_id: int, db: Session = Depends(get_db), 
     notification.is_read = True
     db.commit()
     return {"message": "Notification marked as read"}
+
+@app.get("/api/manager/pending")
+def get_manager_pending(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    # Get all reportees
+    reportees = db.query(models.User).filter(models.User.manager_id == current_user.id).all()
+    reportee_ids = [r.id for r in reportees]
+    
+    if current_user.role == models.UserRole.ADMIN:
+        # Admins see everything pending if they want? Or just everything.
+        # For now, let's stick to manager logic.
+        pass
+
+    pending_leaves = db.query(models.LeaveRequest).filter(
+        models.LeaveRequest.user_id.in_(reportee_ids),
+        models.LeaveRequest.status == models.LeaveStatus.PENDING
+    ).all()
+    
+    # We need to include the user name for display
+    leaves_with_info = []
+    for l in pending_leaves:
+        u = db.query(models.User).filter(models.User.id == l.user_id).first()
+        leaves_with_info.append({
+            "id": l.id,
+            "userName": u.name,
+            "type": l.leave_type,
+            "startDate": l.start_date,
+            "endDate": l.end_date,
+            "reason": l.reason,
+            "status": l.status
+        })
+
+    pending_reg = db.query(models.Attendance).filter(
+        models.Attendance.user_id.in_(reportee_ids),
+        models.Attendance.reg_status == models.RegularizationStatus.PENDING
+    ).all()
+    
+    reg_with_info = []
+    for r in pending_reg:
+        u = db.query(models.User).filter(models.User.id == r.user_id).first()
+        reg_with_info.append({
+            "id": r.id,
+            "userId": r.user_id,
+            "userName": u.name,
+            "date": r.date,
+            "punchIn": r.punch_in,
+            "punchOut": r.punch_out,
+            "status": r.status,
+            "regStatus": r.reg_status.value,
+            "reason": r.reason
+        })
+        
+    return {
+        "leaves": leaves_with_info,
+        "regularizations": reg_with_info
+    }
+
+# Regularization Approval
+@app.post("/api/attendance/{attendance_id}/approve")
+def approve_regularization(attendance_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    record = db.query(models.Attendance).filter(models.Attendance.id == attendance_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Attendance record not found")
+    
+    # Permission check: Manager of the user or Admin
+    user = db.query(models.User).filter(models.User.id == record.user_id).first()
+    if current_user.role != models.UserRole.ADMIN and current_user.id != user.manager_id:
+        raise HTTPException(status_code=403, detail="Not authorized to approve this request")
+    
+    record.reg_status = models.RegularizationStatus.APPROVED
+    db.commit()
+    
+    # Notify user
+    notif = models.Notification(
+        user_id=record.user_id,
+        title="Regularization Approved",
+        message=f"Your regularization request for {record.date} has been approved.",
+        type="ATTENDANCE"
+    )
+    db.add(notif)
+    
+    # Delete manager's notification
+    manager_notif = db.query(models.Notification).filter(
+        models.Notification.user_id == current_user.id,
+        models.Notification.message.like(f"%{user.name} requested regularization for {record.date}%")
+    ).first()
+    if manager_notif:
+        db.delete(manager_notif)
+        
+    db.commit()
+    
+    return {"message": "Request approved"}
+
+@app.post("/api/attendance/{attendance_id}/reject")
+def reject_regularization(attendance_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    record = db.query(models.Attendance).filter(models.Attendance.id == attendance_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Attendance record not found")
+    
+    user = db.query(models.User).filter(models.User.id == record.user_id).first()
+    if current_user.role != models.UserRole.ADMIN and current_user.id != user.manager_id:
+        raise HTTPException(status_code=403, detail="Not authorized to reject this request")
+    
+    record.reg_status = models.RegularizationStatus.REJECTED
+    # If rejected, we might want to revert status to ABSENT
+    record.status = models.AttendanceStatus.ABSENT
+    db.commit()
+    
+    # Notify user
+    notif = models.Notification(
+        user_id=record.user_id,
+        title="Regularization Rejected",
+        message=f"Your regularization request for {record.date} has been rejected.",
+        type="ATTENDANCE"
+    )
+    db.add(notif)
+    
+    # Delete manager's notification
+    manager_notif = db.query(models.Notification).filter(
+        models.Notification.user_id == current_user.id,
+        models.Notification.message.like(f"%{user.name} requested regularization for {record.date}%")
+    ).first()
+    if manager_notif:
+        db.delete(manager_notif)
+        
+    db.commit()
+    
+    return {"message": "Request rejected"}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

@@ -97,8 +97,33 @@ export class RegularizationComponent implements OnInit {
       if (hours < 8) {
         record.status = 'INCOMPLETE';
       }
-    } else if (this.selectedStatus() === 'LEAVE') {
-      record.leaveType = this.leaveType();
+    }
+    
+    if (this.selectedStatus() === 'ABSENT') {
+      if (!this.leaveType()) {
+        alert('Please select a leave type');
+        this.isSubmitting.set(false);
+        return;
+      }
+      const leave: any = {
+        startDate: this.targetDate(),
+        endDate: this.targetDate(),
+        leaveType: this.leaveType(),
+        reason: this.reason()
+      };
+      this.api.requestLeave(leave).subscribe({
+        next: () => {
+          this.isSubmitting.set(false);
+          alert('Leave application submitted successfully');
+          this.router.navigate(['/dashboard']);
+        },
+        error: (err) => {
+          this.isSubmitting.set(false);
+          const errorMsg = err.error?.detail || 'Failed to submit leave. Please try again.';
+          alert(errorMsg);
+        }
+      });
+      return;
     }
 
     const userId = this.auth.currentUser()?.id;

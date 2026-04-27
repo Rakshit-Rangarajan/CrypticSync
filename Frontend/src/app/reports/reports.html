@@ -73,7 +73,7 @@
         </div>
         <div class="chart-placeholder">
           <div class="chart-bars">
-            @for (day of weekData; track day.label) {
+            @for (day of weekData(); track day.label) {
               <div class="bar-container">
                 <div class="bar" [style.height.%]="day.percentage" [class]="'bar-' + day.status"></div>
                 <span class="bar-label">{{ day.label }}</span>
@@ -98,19 +98,19 @@
         <div class="month-stats">
           <div class="month-item">
             <span class="month-label">Working Days</span>
-            <span class="month-value">{{ monthlyStats.workingDays }}</span>
+            <span class="month-value">{{ monthlyStats().workingDays }}</span>
           </div>
           <div class="month-item">
             <span class="month-label">Present</span>
-            <span class="month-value success">{{ monthlyStats.present }}</span>
+            <span class="month-value success">{{ monthlyStats().present }}</span>
           </div>
           <div class="month-item">
             <span class="month-label">Absent</span>
-            <span class="month-value danger">{{ monthlyStats.absent }}</span>
+            <span class="month-value danger">{{ monthlyStats().absent }}</span>
           </div>
           <div class="month-item">
             <span class="month-label">On Leave</span>
-            <span class="month-value info">{{ monthlyStats.onLeave }}</span>
+            <span class="month-value info">{{ monthlyStats().onLeave }}</span>
           </div>
         </div>
       </div>
@@ -158,7 +158,7 @@
             </tr>
           </thead>
           <tbody>
-            @for (record of attendanceHistory; track record.date) {
+            @for (record of attendanceHistory(); track record.date) {
               <tr [class]="'row-' + record.status.toLowerCase()">
                 <td>{{ record.date }}</td>
                 <td>
