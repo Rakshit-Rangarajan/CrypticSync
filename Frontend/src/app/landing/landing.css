@@ -210,7 +210,6 @@
   gap: 3rem;
   padding: 2rem 0;
 }
-
 .draft-item {
   background: white;
   padding: 1.25rem;
@@ -220,17 +219,14 @@
   cursor: zoom-in;
   position: relative;
 }
-
 .draft-item:nth-child(odd) { transform: rotate(-1.5deg); }
 .draft-item:nth-child(even) { transform: rotate(2deg); }
 .draft-item:nth-child(3n) { transform: rotate(-0.5deg) translateY(-10px); }
-
 .draft-item:hover {
   transform: scale(1.05) rotate(0deg) translateY(-15px);
   z-index: 10;
   box-shadow: 0 20px 40px rgba(99, 102, 241, 0.2);
 }
-
 .draft-item img {
   width: 100%;
   height: auto;
@@ -238,7 +234,6 @@
   filter: grayscale(20%) contrast(110%);
   border: 1px solid #eee;
 }
-
 .draft-label {
   margin-top: 1.25rem;
   color: #1f2937;

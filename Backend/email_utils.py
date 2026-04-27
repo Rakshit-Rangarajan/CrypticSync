@@ -18,12 +18,15 @@ import os
 #   SMTP_PASS = "your-resend-api-key"
 #   SMTP_USE_SSL = True (if port 465)
 
-SMTP_HOST = os.getenv("SMTP_HOST", "smtp.ethereal.email")
-SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
-SMTP_USER = os.getenv("SMTP_USER", "")
-SMTP_PASS = os.getenv("SMTP_PASS", "")
-SMTP_USE_TLS = os.getenv("SMTP_USE_TLS", "True").lower() in ('true', '1', 't')
-SMTP_USE_SSL = os.getenv("SMTP_USE_SSL", "False").lower() in ('true', '1', 't')
+def get_smtp_config():
+    return {
+        "host": os.getenv("SMTP_HOST", "smtp.ethereal.email"),
+        "port": int(os.getenv("SMTP_PORT", "587")),
+        "user": os.getenv("SMTP_USER", ""),
+        "pass": os.getenv("SMTP_PASS", ""),
+        "use_tls": os.getenv("SMTP_USE_TLS", "True").lower() in ('true', '1', 't'),
+        "use_ssl": os.getenv("SMTP_USE_SSL", "False").lower() in ('true', '1', 't')
+    }
 
 def send_reset_email(to_email: str, reset_url: str, user_name: str, is_new_user: bool = False):
     subject = "Welcome to CrypticSync! Set your Password" if is_new_user else "CrypticSync Password Reset Request"
@@ -50,7 +53,8 @@ def send_reset_email(to_email: str, reset_url: str, user_name: str, is_new_user:
     </html>
     """
 
-    if not SMTP_USER or not SMTP_PASS:
+    config = get_smtp_config()
+    if not config["user"] or not config["pass"]:
         print("\n" + "="*50)
         print(f"EMAIL INTERCEPTED (No SMTP Credentials Configured)")
         print(f"To: {to_email}")
@@ -60,32 +64,33 @@ def send_reset_email(to_email: str, reset_url: str, user_name: str, is_new_user:
         return
 
     msg = MIMEMultipart()
-    # Note: For Resend, the sender domain must be verified. 
-    # Use 'onboarding@resend.dev' for testing if you haven't verified a domain.
-    msg['From'] = "onboarding@resend.dev" if "resend" in SMTP_HOST else "noreply@crypticsync.com"
+    # Ethereal requires the From address to be the SMTP_USER
+    if "ethereal" in config["host"]:
+        msg['From'] = config["user"]
+    elif "resend" in config["host"]:
+        msg['From'] = "onboarding@resend.dev"
+    else:
+        msg['From'] = "noreply@crypticsync.com"
+        
     msg['To'] = to_email
     msg['Subject'] = subject
     
     msg.attach(MIMEText(html_content, 'html'))
 
     try:
-        if SMTP_USE_SSL:
-            # Resend using Port 465 uses SSL directly
-            with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT) as server:
-                server.login(SMTP_USER, SMTP_PASS)
+        if config["use_ssl"]:
+            with smtplib.SMTP_SSL(config["host"], config["port"]) as server:
+                server.login(config["user"], config["pass"])
                 server.send_message(msg)
         else:
-            # Ethereal or Resend on Port 587 uses explicit TLS
-            with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
-                if SMTP_USE_TLS:
+            with smtplib.SMTP(config["host"], config["port"]) as server:
+                if config["use_tls"]:
                     server.starttls()
-                server.login(SMTP_USER, SMTP_PASS)
+                server.login(config["user"], config["pass"])
                 server.send_message(msg)
-                
-        print(f"Successfully sent email to {to_email} via {SMTP_HOST}.")
+        print(f"Successfully sent email to {to_email} via {config['host']}.")
     except Exception as e:
         print(f"Failed to send email via SMTP: {str(e)}")
-        # Fallback to console print if sending fails
         print(f"Reset URL: {reset_url}")
 
 def send_contact_email(name: str, from_email: str, rating: int, message: str):
@@ -106,7 +111,8 @@ def send_contact_email(name: str, from_email: str, rating: int, message: str):
     </html>
     """
 
-    if not SMTP_USER or not SMTP_PASS:
+    config = get_smtp_config()
+    if not config["user"] or not config["pass"]:
         print("\n" + "!"*50)
         print(f"CONTACT EMAIL INTERCEPTED (No SMTP Config)")
         print(f"To: {target_email}")
@@ -117,22 +123,28 @@ def send_contact_email(name: str, from_email: str, rating: int, message: str):
         return
 
     msg = MIMEMultipart()
-    msg['From'] = "onboarding@resend.dev" if "resend" in SMTP_HOST else "noreply@crypticsync.com"
+    if "ethereal" in config["host"]:
+        msg['From'] = config["user"]
+    elif "resend" in config["host"]:
+        msg['From'] = "onboarding@resend.dev"
+    else:
+        msg['From'] = "noreply@crypticsync.com"
+        
     msg['To'] = target_email
     msg['Subject'] = subject
     
     msg.attach(MIMEText(html_content, 'html'))
 
     try:
-        if SMTP_USE_SSL:
-            with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT) as server:
-                server.login(SMTP_USER, SMTP_PASS)
+        if config["use_ssl"]:
+            with smtplib.SMTP_SSL(config["host"], config["port"]) as server:
+                server.login(config["user"], config["pass"])
                 server.send_message(msg)
         else:
-            with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
-                if SMTP_USE_TLS:
+            with smtplib.SMTP(config["host"], config["port"]) as server:
+                if config["use_tls"]:
                     server.starttls()
-                server.login(SMTP_USER, SMTP_PASS)
+                server.login(config["user"], config["pass"])
                 server.send_message(msg)
         print(f"Successfully sent contact email to {target_email}.")
     except Exception as e:

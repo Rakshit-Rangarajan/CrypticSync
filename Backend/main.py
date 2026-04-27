@@ -1,5 +1,7 @@
 import os
 from dotenv import load_dotenv
+load_dotenv()
+
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -12,8 +14,6 @@ from passlib.context import CryptContext
 import models, schemas, random, secrets
 from database import SessionLocal, engine
 import email_utils
-
-load_dotenv()
 
 SECRET_KEY = os.getenv("SECRET_KEY", "crypticsync_secret_key_change_me_in_production")
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
