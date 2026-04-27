@@ -26,7 +26,9 @@ export interface TokenResponse {
   providedIn: 'root'
 })
 export class AuthService {
-  private apiUrl = 'http://localhost:8000/api';
+  private apiUrl = window.location.hostname === 'localhost' 
+    ? 'http://localhost:8000/api' 
+    : 'https://api.rakshitr.co.in/CrypticSync/api';
   
   currentUser = signal<User | null>(null);
   isAuthenticated = signal<boolean>(false);

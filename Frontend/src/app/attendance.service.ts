@@ -76,7 +76,9 @@ export interface AppNotification {
 })
 export class AttendanceService {
   private http = inject(HttpClient);
-  private apiUrl = 'http://localhost:8000/api';
+  private apiUrl = window.location.hostname === 'localhost' 
+    ? 'http://localhost:8000/api' 
+    : 'https://api.rakshitr.co.in/CrypticSync/api';
 
   private getHeaders() {
     const token = localStorage.getItem('token');
