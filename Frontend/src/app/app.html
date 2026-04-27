@@ -1,12 +1,12 @@
 <div class="app-layout" [class.authenticated]="authService.isAuthenticated()">
-  @if (authService.isAuthenticated()) {
+  @if (authService.isAuthenticated() && !isLandingPage()) {
     <app-navbar />
     <main class="main-content">
       <router-outlet />
     </main>
     <app-footer />
   } @else {
-    <div class="auth-container">
+    <div [class.auth-container]="!isLandingPage()">
       <router-outlet />
     </div>
   }

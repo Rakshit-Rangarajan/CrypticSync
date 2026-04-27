@@ -12,6 +12,7 @@ import { AttendanceService, User, HolidayRecord } from '../attendance.service';
 })
 export class AdminComponent implements OnInit {
   private api = inject(AttendanceService);
+  protected Math = Math;
   
   users = signal<User[]>([]);
   holidays = signal<HolidayRecord[]>([]);
@@ -22,21 +23,26 @@ export class AdminComponent implements OnInit {
   showHolidayModal = signal(false);
   showDeptModal = signal(false);
   
+  // Pagination
+  currentPage = signal(1);
+  pageSize = signal(10);
+  
   teams = signal<any[]>([]);
 
   newDept = signal({ name: '', department: '' });
 
   isEditMode = signal(false);
   editingUserId = signal<number | null>(null);
+  formStatus = signal<{ type: 'success' | 'error', message: string } | null>(null);
 
   newUser = signal<Partial<User>>({
+    employeeId: '',
     name: '',
     email: '',
     role: 'EMPLOYEE',
     designation: '',
     department: '',
-    managerId: null as any,
-    password: 'password123'
+    managerId: null as any
   });
 
   newHoliday = signal<Partial<HolidayRecord>>({
@@ -54,6 +60,13 @@ export class AdminComponent implements OnInit {
       (u.employeeId && u.employeeId.toLowerCase().includes(term))
     );
   });
+
+  paginatedUsers = computed(() => {
+    const start = (this.currentPage() - 1) * this.pageSize();
+    return this.filteredUsers().slice(start, start + this.pageSize());
+  });
+
+  totalPages = computed(() => Math.ceil(this.filteredUsers().length / this.pageSize()));
 
   getManagerName(managerId?: number): string {
     if (!managerId) return 'None';
@@ -116,13 +129,13 @@ export class AdminComponent implements OnInit {
     this.isEditMode.set(false);
     this.editingUserId.set(null);
     this.newUser.set({
+      employeeId: '',
       name: '',
       email: '',
       role: 'EMPLOYEE',
       designation: '',
       department: '',
-      managerId: null as any,
-      password: 'password123'
+      managerId: null as any
     });
     this.showUserModal.set(true);
   }
@@ -131,6 +144,7 @@ export class AdminComponent implements OnInit {
     this.isEditMode.set(true);
     this.editingUserId.set(user.id);
     this.newUser.set({
+      employeeId: user.employeeId,
       name: user.name,
       email: user.email,
       role: user.role,
@@ -141,23 +155,36 @@ export class AdminComponent implements OnInit {
     this.showUserModal.set(true);
   }
 
-  submitUser() {
-    if (this.isEditMode()) {
-      const id = this.editingUserId();
-      if (id) {
-        this.api.updateUser(id, this.newUser()).subscribe(() => {
-          alert('User updated successfully');
-          this.showUserModal.set(false);
-          this.loadUsers();
-        });
-      }
-    } else {
-      this.api.createUser(this.newUser()).subscribe(() => {
-        alert('User added successfully');
-        this.showUserModal.set(false);
+  submitUser(keepOpen: boolean = false) {
+    this.formStatus.set(null);
+    
+    const obs = this.isEditMode() 
+      ? this.api.updateUser(this.editingUserId()!, this.newUser())
+      : this.api.createUser(this.newUser());
+
+    obs.subscribe({
+      next: () => {
+        this.formStatus.set({ type: 'success', message: `Employee ${this.isEditMode() ? 'updated' : 'created'} successfully!` });
         this.loadUsers();
-      });
-    }
+        
+        if (!keepOpen) {
+          setTimeout(() => {
+            this.showUserModal.set(false);
+            this.formStatus.set(null);
+          }, 1500);
+        } else {
+          // Keep open and reset
+          const nextRole = this.newUser().role; // Keep role for multiple adds
+          const nextDept = this.newUser().department;
+          this.openAddUser();
+          this.newUser.update(u => ({ ...u, role: nextRole, department: nextDept }));
+          setTimeout(() => this.formStatus.set(null), 3000);
+        }
+      },
+      error: (err) => {
+        this.formStatus.set({ type: 'error', message: err.error?.detail || 'An error occurred' });
+      }
+    });
   }
 
   submitHoliday() {

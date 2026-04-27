@@ -1,5 +1,5 @@
 import { Component, inject } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
+import { RouterOutlet, Router } from '@angular/router';
 import { NavbarComponent } from './navbar/navbar';
 import { FooterComponent } from './footer/footer';
 import { AuthService } from './auth.service';
@@ -13,4 +13,9 @@ import { AuthService } from './auth.service';
 })
 export class App {
   authService = inject(AuthService);
+  private router = inject(Router);
+
+  isLandingPage(): boolean {
+    return this.router.url === '/' || this.router.url === '';
+  }
 }

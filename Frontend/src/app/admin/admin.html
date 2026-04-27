@@ -43,7 +43,7 @@
               </tr>
             </thead>
             <tbody>
-              @for (user of filteredUsers(); track user.id) {
+              @for (user of paginatedUsers(); track user.id) {
                 <tr [class.inactive]="!user.isActive">
                   <td>
                     <div class="user-cell">
@@ -80,6 +80,33 @@
               }
             </tbody>
           </table>
+        </div>
+
+        <!-- Pagination Controls -->
+        <div class="pagination">
+          <div class="pagination-info">
+            Showing {{ (currentPage() - 1) * pageSize() + 1 }} to {{ Math.min(currentPage() * pageSize(), filteredUsers().length) }} of {{ filteredUsers().length }} employees
+          </div>
+          <div class="pagination-actions">
+            <button class="btn-page" [disabled]="currentPage() === 1" (click)="currentPage.set(currentPage() - 1)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+            </button>
+            
+            <div class="page-numbers">
+              @for (page of [].constructor(totalPages()); track $index) {
+                <button 
+                  class="btn-number" 
+                  [class.active]="currentPage() === ($index + 1)"
+                  (click)="currentPage.set($index + 1)">
+                  {{ $index + 1 }}
+                </button>
+              }
+            </div>
+
+            <button class="btn-page" [disabled]="currentPage() === totalPages()" (click)="currentPage.set(currentPage() + 1)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </button>
+          </div>
         </div>
       </div>
     }
@@ -119,54 +146,152 @@
         </section>
       </div>
     }
-
+    <!-- SYSTEM LOGS TAB -->
+    @if (activeTab() === 'logs') {
+      <div class="logs-container card">
+        <div class="logs-header">
+          <h2>System Event Logs</h2>
+          <button class="btn-ghost">Export CSV</button>
+        </div>
+        <div class="logs-list">
+          <div class="log-item">
+            <span class="log-time">10:45 AM</span>
+            <span class="log-type info">INFO</span>
+            <span class="log-msg">Employee CS001 updated profile settings</span>
+          </div>
+          <div class="log-item">
+            <span class="log-time">09:12 AM</span>
+            <span class="log-type success">AUTH</span>
+            <span class="log-msg">New user CS005 created successfully</span>
+          </div>
+          <div class="log-item">
+            <span class="log-time">Yesterday</span>
+            <span class="log-type warning">SYSTEM</span>
+            <span class="log-msg">Backup process completed with 2 skipped files</span>
+          </div>
+        </div>
+      </div>
+    }
   </main>
 
   <!-- ADD USER MODAL -->
   @if (showUserModal()) {
-    <div class="modal-backdrop">
-      <div class="modal card">
-        <header>
-          <h2>{{ isEditMode() ? 'Edit Employee' : 'Add New Employee' }}</h2>
-          <button class="close-btn" (click)="showUserModal.set(false)">×</button>
-        </header>
-        <form (ngSubmit)="submitUser()" class="admin-form">
-          <div class="form-grid">
-            <div class="form-group">
-              <label>Full Name</label>
-              <input type="text" [(ngModel)]="newUser().name" name="name" required>
+    <div class="modal-backdrop" (click)="showUserModal.set(false)">
+      <div class="modal card premium-modal" (click)="$event.stopPropagation()">
+        <header class="modal-header">
+          <div class="header-title">
+            <div class="icon-circle">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+                <polyline points="16 11 18 13 22 9"></polyline>
+              </svg>
             </div>
-            <div class="form-group">
-              <label>Email Address</label>
-              <input type="email" [(ngModel)]="newUser().email" name="email" required>
-            </div>
-            <div class="form-group">
-              <label>Role</label>
-              <select [(ngModel)]="newUser().role" name="role">
-                <option value="EMPLOYEE">Employee</option>
-                <option value="TEAM_LEAD">Team Lead</option>
-                <option value="MANAGER">Manager</option>
-                <option value="ADMIN">Admin</option>
-                <option value="CTO">CTO</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>Reporting Manager</label>
-              <select [(ngModel)]="newUser().managerId" name="managerId">
-                <option [ngValue]="null">None</option>
-                @for (mgr of users(); track mgr.id) {
-                  <option [ngValue]="mgr.id">{{ mgr.name }} ({{ mgr.employeeId }})</option>
-                }
-              </select>
-            </div>
-            <div class="form-group">
-              <label>Department</label>
-              <input type="text" [(ngModel)]="newUser().department" name="department">
+            <div>
+              <h2>{{ isEditMode() ? 'Edit Employee' : 'Add New Employee' }}</h2>
+              <p>{{ isEditMode() ? 'Update user details and permissions' : 'Create a new account and trigger setup email' }}</p>
             </div>
           </div>
-          <div class="modal-actions">
-            <button type="button" class="btn-ghost" (click)="showUserModal.set(false)">Cancel</button>
-            <button type="submit" class="btn-primary">{{ isEditMode() ? 'Save Changes' : 'Create User' }}</button>
+          <button class="close-btn" (click)="showUserModal.set(false)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </header>
+
+        <form (ngSubmit)="submitUser(false)" class="admin-form">
+          <div class="form-scroll-area">
+            <div class="form-section">
+              <h3>Basic Information</h3>
+              <div class="form-grid">
+                <div class="form-group">
+                  <label>Full Name</label>
+                  <div class="input-with-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                    <input type="text" [(ngModel)]="newUser().name" name="name" required placeholder="John Doe">
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>Email Address</label>
+                  <div class="input-with-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                    <input type="email" [(ngModel)]="newUser().email" name="email" required placeholder="john@crypticsync.com">
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-section">
+              <h3>Organization & Role</h3>
+              <div class="form-grid">
+                <div class="form-group">
+                  <label>Department</label>
+                  <div class="input-with-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                    <input type="text" [(ngModel)]="newUser().department" name="department" placeholder="Engineering">
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>Designation</label>
+                  <div class="input-with-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-1.196-12.36a4.5 4.5 0 000-8.518c1.652 2.746 2.654 5.892 2.654 9.286 0 2.355-.49 4.6-1.378 6.627m0 0c-.888-2.027-1.378-4.272-1.378-6.627 0-3.394 1.002-6.54 2.654-9.286a4.5 4.5 0 000 8.518c1.744 2.772 2.753 6.054 2.753 9.571"></path></svg>
+                    <input type="text" [(ngModel)]="newUser().designation" name="designation" placeholder="Senior Architect">
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>Role</label>
+                  <div class="input-with-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                    <select [(ngModel)]="newUser().role" name="role">
+                      <option value="EMPLOYEE">Employee</option>
+                      <option value="TEAM_LEAD">Team Lead</option>
+                      <option value="MANAGER">Manager</option>
+                      <option value="ADMIN">Admin</option>
+                      <option value="CTO">CTO</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>Reporting Manager</label>
+                  <div class="input-with-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                    <select [(ngModel)]="newUser().managerId" name="managerId">
+                      <option [ngValue]="null">None</option>
+                      @for (mgr of users(); track mgr.id) {
+                        <option [ngValue]="mgr.id">{{ mgr.name }} ({{ mgr.employeeId }})</option>
+                      }
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          @if (formStatus()) {
+            <div class="form-feedback" [class]="formStatus()?.type">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                @if (formStatus()?.type === 'success') {
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                } @else {
+                  <circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line>
+                }
+              </svg>
+              <span>{{ formStatus()?.message }}</span>
+            </div>
+          }
+
+          <div class="modal-footer">
+            <div class="footer-left">
+              @if (!isEditMode()) {
+                <button type="button" class="btn-secondary" (click)="submitUser(true)">
+                  Save & Add Another
+                </button>
+              }
+            </div>
+            <div class="footer-right">
+              <button type="button" class="btn-ghost" (click)="showUserModal.set(false)">Cancel</button>
+              <button type="submit" class="btn-primary">
+                {{ isEditMode() ? 'Update Employee' : 'Create Employee' }}
+              </button>
+            </div>
           </div>
         </form>
       </div>

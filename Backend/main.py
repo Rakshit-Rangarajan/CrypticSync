@@ -9,8 +9,9 @@ from datetime import datetime, timedelta, date, time
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
-import models, schemas, random
+import models, schemas, random, secrets
 from database import SessionLocal, engine
+import email_utils
 
 load_dotenv()
 
@@ -200,6 +201,46 @@ def read_root(db: Session = Depends(get_db)):
         "message": "CrypticSync Enterprise API is running.",
         "user_count": user_count
     }
+
+@app.post("/api/auth/forgot-password")
+def forgot_password(req: schemas.ForgotPasswordRequest, db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.email == req.email).first()
+    if user:
+        token = secrets.token_urlsafe(32)
+        user.reset_token = token
+        user.reset_token_expires = datetime.utcnow() + timedelta(hours=1)
+        db.commit()
+        
+        reset_url = f"http://localhost:4200/reset-password?token={token}"
+        email_utils.send_reset_email(user.email, reset_url, user.name, is_new_user=False)
+        
+    return {"message": "If the email is registered, a password reset link has been sent."}
+
+@app.post("/api/auth/reset-password")
+def reset_password(req: schemas.ResetPasswordRequest, db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(
+        models.User.reset_token == req.token,
+        models.User.reset_token_expires > datetime.utcnow()
+    ).first()
+    
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid or expired token")
+        
+    user.hashed_password = get_password_hash(req.new_password)
+    user.reset_token = None
+    user.reset_token_expires = None
+    db.commit()
+    return {"message": "Password reset successfully"}
+
+@app.post("/api/contact")
+def submit_contact(request: schemas.ContactRequest):
+    email_utils.send_contact_email(
+        name=request.name,
+        from_email=request.email,
+        rating=request.rating,
+        message=request.message
+    )
+    return {"message": "Thank you for your feedback!"}
 
 @app.post("/api/token", response_model=schemas.Token)
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
@@ -607,16 +648,22 @@ def get_org_hierarchy(db: Session = Depends(get_db), current_user: models.User =
 
 @app.post("/api/users", response_model=schemas.User)
 def create_user(user: schemas.UserCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    if current_user.role not in [models.UserRole.ADMIN, models.UserRole.CTO]:
+    if current_user.role not in [models.UserRole.ADMIN, models.UserRole.SUPER_ADMIN, models.UserRole.CTO]:
         raise HTTPException(status_code=403, detail="Only admins can create users.")
     
     db_user = db.query(models.User).filter(models.User.email == user.email).first()
     if db_user:
         raise HTTPException(status_code=400, detail="Email already registered")
     
-    hashed_pwd = get_password_hash(user.password)
+    emp_id = user.employee_id
+    if not emp_id:
+        user_count = db.query(models.User).count()
+        emp_id = f"CS{str(user_count + 1).zfill(3)}"
+
+    hashed_pwd = get_password_hash(user.password) if user.password else get_password_hash(secrets.token_urlsafe(16))
+    token = secrets.token_urlsafe(32)
     db_user = models.User(
-        employee_id=user.employee_id,
+        employee_id=emp_id,
         name=user.name,
         email=user.email,
         hashed_password=hashed_pwd,
@@ -624,24 +671,30 @@ def create_user(user: schemas.UserCreate, db: Session = Depends(get_db), current
         designation=user.designation,
         role=user.role,
         team_id=user.team_id,
-        manager_id=user.manager_id
+        manager_id=user.manager_id,
+        reset_token=token,
+        reset_token_expires=datetime.utcnow() + timedelta(hours=72)
     )
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
     
     # Initialize leave balances
-    for lt in models.LeaveType:
-        if lt != models.LeaveType.WFH:
-            balance = models.LeaveBalance(user_id=db_user.id, leave_type=lt, total_days=12, used_days=0)
-            db.add(balance)
-    db.commit()
+    if db_user.role != models.UserRole.SUPER_ADMIN:
+        for lt in models.LeaveType:
+            if lt != models.LeaveType.WFH and lt != models.LeaveType.COMPENSATORY_OFF:
+                balance = models.LeaveBalance(user_id=db_user.id, leave_type=lt, total_days=12, used_days=0)
+                db.add(balance)
+        db.commit()
+        
+    reset_url = f"http://localhost:4200/reset-password?token={token}"
+    email_utils.send_reset_email(db_user.email, reset_url, db_user.name, is_new_user=True)
     
     return db_user
 
 @app.delete("/api/users/{user_id}")
 def delete_user(user_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    if current_user.role != models.UserRole.ADMIN:
+    if current_user.role not in [models.UserRole.ADMIN, models.UserRole.SUPER_ADMIN]:
         raise HTTPException(status_code=403, detail="Only admins can delete users.")
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if not user:
@@ -652,7 +705,7 @@ def delete_user(user_id: int, db: Session = Depends(get_db), current_user: model
 
 @app.post("/api/teams", response_model=schemas.Team)
 def create_team(team: schemas.TeamCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    if current_user.role != models.UserRole.ADMIN:
+    if current_user.role not in [models.UserRole.ADMIN, models.UserRole.SUPER_ADMIN]:
         raise HTTPException(status_code=403, detail="Only admins can create teams.")
     db_team = models.Team(**team.model_dump())
     db.add(db_team)
@@ -663,7 +716,7 @@ def create_team(team: schemas.TeamCreate, db: Session = Depends(get_db), current
 # Holiday Management (Admin Only)
 @app.post("/api/holidays", response_model=schemas.Holiday)
 def create_holiday(holiday: schemas.HolidayBase, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    if current_user.role != models.UserRole.ADMIN:
+    if current_user.role not in [models.UserRole.ADMIN, models.UserRole.SUPER_ADMIN]:
         raise HTTPException(status_code=403, detail="Only admins can manage holidays.")
     db_holiday = models.Holiday(
         date=holiday.date,
@@ -678,7 +731,7 @@ def create_holiday(holiday: schemas.HolidayBase, db: Session = Depends(get_db), 
 
 @app.delete("/api/holidays/{holiday_id}")
 def delete_holiday(holiday_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    if current_user.role != models.UserRole.ADMIN:
+    if current_user.role not in [models.UserRole.ADMIN, models.UserRole.SUPER_ADMIN]:
         raise HTTPException(status_code=403, detail="Only admins can manage holidays.")
     db_holiday = db.query(models.Holiday).filter(models.Holiday.id == holiday_id).first()
     if not db_holiday:
@@ -701,7 +754,7 @@ def delete_user(user_id: int, db: Session = Depends(get_db), current_user: model
 
 @app.put("/api/users/{user_id}", response_model=schemas.User)
 def update_user(user_id: int, user_data: schemas.UserBase, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    if current_user.role != models.UserRole.ADMIN:
+    if current_user.role not in [models.UserRole.ADMIN, models.UserRole.SUPER_ADMIN]:
         raise HTTPException(status_code=403, detail="Only admins can update users.")
     db_user = db.query(models.User).filter(models.User.id == user_id).first()
     if not db_user:
@@ -716,7 +769,7 @@ def update_user(user_id: int, user_data: schemas.UserBase, db: Session = Depends
 
 @app.delete("/api/teams/{team_id}")
 def delete_team(team_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    if current_user.role != models.UserRole.ADMIN:
+    if current_user.role not in [models.UserRole.ADMIN, models.UserRole.SUPER_ADMIN]:
         raise HTTPException(status_code=403, detail="Only admins can delete teams.")
     team = db.query(models.Team).filter(models.Team.id == team_id).first()
     if not team:

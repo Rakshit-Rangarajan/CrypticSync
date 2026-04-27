@@ -73,6 +73,14 @@ export class AuthService {
     );
   }
 
+  forgotPassword(email: string): Observable<any> {
+    return this.http.post(`${this.apiUrl}/auth/forgot-password`, { email });
+  }
+
+  resetPassword(token: string, new_password: string): Observable<any> {
+    return this.http.post(`${this.apiUrl}/auth/reset-password`, { token, new_password });
+  }
+
   fetchCurrentUser(): Observable<User> {
     const token = localStorage.getItem('token');
     const headers = new HttpHeaders({

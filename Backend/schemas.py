@@ -24,7 +24,14 @@ class UserBase(BaseSchema):
     is_active: bool = True
 
 class UserCreate(UserBase):
-    password: str
+    password: Optional[str] = None
+
+class ForgotPasswordRequest(BaseSchema):
+    email: EmailStr
+
+class ResetPasswordRequest(BaseSchema):
+    token: str
+    new_password: str
 
 class User(UserBase):
     id: int
@@ -149,3 +156,9 @@ class BroadcastNotification(BaseSchema):
     type: str
     target_type: str # ALL, INDIVIDUAL, ROLE, TEAM, DEPARTMENT
     target_value: Optional[str] = None
+
+class ContactRequest(BaseSchema):
+    name: str
+    email: EmailStr
+    rating: int = 5
+    message: str

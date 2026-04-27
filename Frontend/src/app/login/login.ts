@@ -15,6 +15,10 @@ export class Login {
   password = '';
   isLoading = signal(false);
   error = signal('');
+  
+  isForgotPasswordView = signal(false);
+  forgotEmail = '';
+  forgotMessage = signal('');
 
   constructor(private authService: AuthService) {}
 
@@ -50,5 +54,32 @@ export class Login {
     this.username = demos[role].u;
     this.password = demos[role].p;
     this.onSubmit();
+  }
+
+  toggleForgotPassword() {
+    this.isForgotPasswordView.set(!this.isForgotPasswordView());
+    this.error.set('');
+    this.forgotMessage.set('');
+  }
+
+  requestPasswordReset() {
+    if (!this.forgotEmail) {
+      this.error.set('Please enter your email address');
+      return;
+    }
+
+    this.isLoading.set(true);
+    this.error.set('');
+    
+    this.authService.forgotPassword(this.forgotEmail).subscribe({
+      next: (res) => {
+        this.isLoading.set(false);
+        this.forgotMessage.set(res.message || 'Password reset link sent to your email.');
+      },
+      error: (err) => {
+        this.isLoading.set(false);
+        this.error.set('Failed to send reset link. Please try again later.');
+      }
+    });
   }
 }

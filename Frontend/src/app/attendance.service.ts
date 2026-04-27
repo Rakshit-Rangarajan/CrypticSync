@@ -222,4 +222,8 @@ export class AttendanceService {
   markNotificationRead(id: number): Observable<any> {
     return this.http.post<any>(`${this.apiUrl}/notifications/${id}/read`, {}, { headers: this.getHeaders() });
   }
+
+  submitContact(data: { name: string; email: string; rating: number; message: string }): Observable<any> {
+    return this.http.post(`${this.apiUrl}/contact`, data);
+  }
 }

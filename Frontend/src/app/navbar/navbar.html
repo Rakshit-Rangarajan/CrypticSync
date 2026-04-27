@@ -45,7 +45,7 @@
           Management
         </a>
       }
-      @if (authService.currentUser()?.role === 'ADMIN' || authService.currentUser()?.role === 'CTO') {
+      @if (authService.currentUser()?.role === 'ADMIN' || authService.currentUser()?.role === 'CTO' || authService.currentUser()?.role === 'SUPER_ADMIN') {
         <a routerLink="/admin" routerLinkActive="active" class="nav-link">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="3"></circle>

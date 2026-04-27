@@ -1,0 +1,185 @@
+<div class="landing-container">
+  <!-- Navigation -->
+  <nav class="landing-nav">
+    <div class="nav-brand">
+      <div class="logo-icon">CS</div>
+      <span>CrypticSync</span>
+    </div>
+    <div class="nav-links">
+      <a href="#tech-stack">Stack</a>
+      <a href="#approach">Approach</a>
+      <a href="#resources">Resources</a>
+      <a href="CrypticSync_Doc.pdf" target="_blank" class="nav-doc">Documentation</a>
+      @if (authService.isAuthenticated()) {
+        <a routerLink="/dashboard" class="btn-app">Open App</a>
+      } @else {
+        <a routerLink="/login" class="btn-login">Login</a>
+      }
+    </div>
+  </nav>
+
+  <!-- Hero Section -->
+  <header class="hero">
+    <div class="hero-content">
+      <div class="badge">Enterprise Attendance & Management</div>
+      <h1>Securely Synchronize Your <span class="gradient-text">Workforce</span></h1>
+      <p>A high-performance, AI-assisted platform for seamless employee onboarding, attendance tracking, and leave management.</p>
+      <div class="hero-actions">
+        @if (authService.isAuthenticated()) {
+          <button routerLink="/dashboard" class="btn-primary">Go to Dashboard</button>
+        } @else {
+          <button routerLink="/login" class="btn-primary">Get Started</button>
+        }
+        <a href="https://github.com/Rakshit-Rangarajan/CrypticSync" target="_blank" class="btn-outline">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="20"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+          View GitHub
+        </a>
+      </div>
+    </div>
+    <div class="hero-bg-glow"></div>
+  </header>
+
+  <!-- Tech Stack Section -->
+  <section id="tech-stack" class="section">
+    <div class="section-header">
+      <h2>The <span class="gradient-text">Core</span> Architecture</h2>
+      <p>Built with modern technologies to ensure scalability, security, and performance.</p>
+    </div>
+    
+    <div class="tech-grid">
+      <div class="tech-card">
+        <div class="tech-icon angular">A</div>
+        <h3>Angular 21</h3>
+        <p>Selected for its <strong>Signal-based reactivity</strong> and robust component architecture. Angular provides the enterprise structure needed for a complex management dashboard.</p>
+        <a href="https://angular.dev" target="_blank" class="learn-more">Learn More &rarr;</a>
+      </div>
+      
+      <div class="tech-card">
+        <div class="tech-icon fastapi">F</div>
+        <h3>FastAPI (Python)</h3>
+        <p>A high-performance framework that handles our asynchronous data flow. We chose it for its <strong>pydantic-powered validation</strong> and built-in OpenAPI documentation.</p>
+        <a href="https://fastapi.tiangolo.com" target="_blank" class="learn-more">API Docs &rarr;</a>
+      </div>
+      
+      <div class="tech-card">
+        <div class="tech-icon jwt">J</div>
+        <h3>JWT Auth</h3>
+        <p>Secure, stateless authentication using JSON Web Tokens. This ensures every request to the backend is verified and authorized without heavy session overhead.</p>
+        <a href="https://fastapi.tiangolo.com/tutorial/security/oauth2-jwt/" target="_blank" class="learn-more">Auth Spec &rarr;</a>
+      </div>
+      
+      <div class="tech-card">
+        <div class="tech-icon sqlite">S</div>
+        <h3>SQLAlchemy</h3>
+        <p>A powerful SQL Toolkit and ORM. We use SQLite for portability and SQLAlchemy for a flexible, Pythonic way to interact with our attendance and user models.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Approach Section -->
+  <section id="approach" class="section glass-section">
+    <div class="approach-content">
+      <div class="approach-text">
+        <h2>Our <span class="gradient-text">Approach</span></h2>
+        <p>CrypticSync was designed with a "Security-First" and "User-Centric" philosophy. Here is how we tackled the project:</p>
+        
+        <ul class="approach-list">
+          <li>
+            <strong>Scalable Role Management:</strong> We implemented a hierarchical role system (SuperAdmin, Admin, CTO, Manager, Employee) that controls every UI element and API endpoint.
+          </li>
+          <li>
+            <strong>Reactive State:</strong> Leveraging Angular Signals allowed us to create a UI that feels alive, updating attendance logs and notifications in real-time.
+          </li>
+          <li>
+            <strong>Email-Based Onboarding:</strong> To eliminate insecure hardcoded passwords, we built a token-based invitation system integrated with SMTP (Resend/Ethereal).
+          </li>
+          <li>
+            <strong>Robust Reporting:</strong> We built complex SQL queries to calculate overtime, lunch breaks, and partial attendance automatically.
+          </li>
+        </ul>
+      </div>
+      <div class="approach-meta">
+        <div class="meta-card">
+          <h4>Assumptions Made</h4>
+          <ul>
+            <li>Work hours are 9 hours/day (Mon-Fri).</li>
+            <li>Lunch break is 1 hour (included in 9h).</li>
+            <li>Attendance before 9 AM is early; after 9 AM is late.</li>
+            <li>SMTP server is available via environment variables.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Resources Section -->
+  <section id="resources" class="section">
+    <div class="section-header">
+      <h2>Project <span class="gradient-text">Resources</span></h2>
+    </div>
+    
+    <div class="resource-links">
+      <a href="https://gemini.google.com/share/20661a6dd20d" target="_blank" class="resource-card">
+        <div class="res-icon chat">AI</div>
+        <div class="res-info">
+          <h4>AI Chat History</h4>
+          <p>Full transcripts of the development process with Google Gemini.</p>
+        </div>
+      </a>
+      
+      <a href="CrypticSync_Doc.pdf" target="_blank" class="resource-card">
+        <div class="res-icon doc">PDF</div>
+        <div class="res-info">
+          <h4>Project Documentation</h4>
+          <p>Detailed PDF covering architecture and setup instructions.</p>
+        </div>
+      </a>
+      
+      <a href="https://github.com/Rakshit-Rangarajan/CrypticSync" target="_blank" class="resource-card">
+        <div class="res-icon git">GH</div>
+        <div class="res-info">
+          <h4>Source Code</h4>
+          <p>The complete repository hosted on GitHub.</p>
+        </div>
+      </a>
+    </div>
+  </section>
+
+  <!-- Review Form -->
+  <footer class="landing-footer">
+    <div class="review-section">
+      <div class="review-header">
+        <h2>Feedback & <span class="gradient-text">Reviews</span></h2>
+        <p>Have suggestions? We'd love to hear from you.</p>
+      </div>
+      
+      <form (ngSubmit)="submitReview()" class="review-form">
+        <div class="form-row">
+          <input type="text" [(ngModel)]="review.name" name="revName" placeholder="Full Name" required>
+          <input type="email" [(ngModel)]="review.email" name="revEmail" placeholder="Email" required>
+        </div>
+        <div class="rating-input">
+          <label>Rating:</label>
+          <div class="stars">
+            @for (s of [1,2,3,4,5]; track s) {
+              <span (click)="review.rating = s" [class.active]="review.rating >= s">★</span>
+            }
+          </div>
+        </div>
+        
+        @if (contactStatus()) {
+          <div class="form-feedback" [class]="contactStatus()?.type">
+            {{ contactStatus()?.message }}
+          </div>
+        }
+
+        <textarea [(ngModel)]="review.message" name="revMsg" placeholder="Your message or review..." rows="4"></textarea>
+        <button type="submit" class="btn-primary">Submit Review</button>
+      </form>
+    </div>
+    
+    <div class="footer-bottom">
+      <p>&copy; 2026 CrypticSync. Built with Angular & FastAPI.</p>
+    </div>
+  </footer>
+</div>

@@ -57,6 +57,8 @@ class User(Base):
     team_id = Column(Integer, ForeignKey("teams.id"), nullable=True)
     manager_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     is_active = Column(Boolean, default=True)
+    reset_token = Column(String(100), nullable=True, index=True)
+    reset_token_expires = Column(DateTime, nullable=True)
 
     manager = relationship("User", remote_side=[id], backref="subordinates")
     attendance_records = relationship("Attendance", back_populates="user")
