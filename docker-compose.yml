@@ -1,0 +1,52 @@
+# docker-compose.yml
+
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: ./Backend
+      dockerfile: Dockerfile
+    container_name: crypticsync_api
+    restart: always
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./Backend/.env
+    environment:
+      # Overrides the localhost DB URL to point to the Docker db container
+      - DATABASE_URL=mysql+pymysql://cryptic_user:SuperSecretPassword123!@db:3306/cryptic_sync_db
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - cryptic_network
+
+  db:
+    image: mysql:8.0
+    container_name: crypticsync_db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: RootPassword123!
+      MYSQL_DATABASE: cryptic_sync_db
+      MYSQL_USER: cryptic_user
+      MYSQL_PASSWORD: SuperSecretPassword123!
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cryptic_network
+
+volumes:
+  mysql_data:
+    # Ensures your database isn't deleted when the container stops
+
+networks:
+  cryptic_network:
+    driver: bridge
